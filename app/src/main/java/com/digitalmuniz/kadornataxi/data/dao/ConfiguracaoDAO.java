@@ -89,6 +89,14 @@ public class ConfiguracaoDAO {
         }
     }
 
+    public void salvarConfiguracaoSilenciosamente(Configuracao configuracao) {
+        if (configExiste()) {
+            updateConfiguracao(configuracao);
+        } else {
+            setConfiguracao(configuracao);
+        }
+    }
+
     private void setConfiguracao(Configuracao configuracao) {
         open();
 

@@ -39,6 +39,50 @@ public class ViagemDAO {
 
         close();
     }
+
+    public int inserirLote(List<Viagem> viagens, boolean substituirExistentes) {
+        open();
+        int inseridos = 0;
+        database.beginTransaction();
+        try {
+            if (substituirExistentes) {
+                database.delete(DbHelper.Viagem.NOME_TABELA, null, null);
+            }
+            for (Viagem viagem : viagens) {
+                if (!substituirExistentes && existeViagemDuplicada(viagem)) {
+                    continue;
+                }
+                insert(viagem);
+                inseridos++;
+            }
+            database.setTransactionSuccessful();
+        } finally {
+            database.endTransaction();
+            close();
+        }
+        return inseridos;
+    }
+
+    private boolean existeViagemDuplicada(Viagem viagem) {
+        String dataFormatada = Viagem.formatarDataISO8601(viagem.getData());
+        String selecao = DbHelper.Viagem.DATA + " = ? AND " +
+                DbHelper.Viagem.HORA + " = ? AND " +
+                DbHelper.Viagem.DESTINO + " = ? AND " +
+                DbHelper.Viagem.VALOR_TOTAL + " = ?";
+        String[] args = new String[]{
+                dataFormatada != null ? dataFormatada : "",
+                viagem.getHora() != null ? viagem.getHora() : "",
+                viagem.getDestino() != null ? viagem.getDestino() : "",
+                String.valueOf(viagem.getValorTotal())
+        };
+
+        try (Cursor cursor = database.query(DbHelper.Viagem.NOME_TABELA,
+                new String[]{DbHelper.Viagem.ID},
+                selecao, args, null, null, null)) {
+            return cursor != null && cursor.getCount() > 0;
+        }
+    }
+
     private long insert(Viagem viagem) {
         ContentValues values = new ContentValues();
         
@@ -172,7 +216,15 @@ public class ViagemDAO {
     // CONTAR TODOS OS REGISTROS
 
     public int getCount() {
-        return 0;
+        open();
+        int count = 0;
+        try (Cursor cursor = database.rawQuery("SELECT COUNT(*) FROM " + DbHelper.Viagem.NOME_TABELA, null)) {
+            if (cursor != null && cursor.moveToFirst()) {
+                count = cursor.getInt(0);
+            }
+        }
+        close();
+        return count;
     }
 
     // BUSCAR UM REGISTRO USANDO OUTROS DADOS

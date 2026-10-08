@@ -249,12 +249,68 @@
                 android:layout_width="match_parent"
                 android:layout_height="wrap_content"
                 android:layout_marginTop="8dp"
-                android:layout_marginBottom="32dp"
+                android:layout_marginBottom="24dp"
                 android:background="@drawable/campo"
                 android:hint="exemplo@email.com"
                 android:inputType="textEmailAddress"
                 android:padding="12dp"
                 android:textColor="@android:color/black" />
+
+            <View
+                android:layout_width="match_parent"
+                android:layout_height="1dp"
+                android:layout_marginBottom="20dp"
+                android:background="#E0E0E0" />
+
+            <TextView
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:text="Transferência de Dados (Troca de Celular)"
+                android:textColor="@color/black"
+                android:textSize="16sp"
+                android:textStyle="bold"
+                android:layout_marginBottom="4dp"/>
+
+            <TextView
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:layout_marginBottom="16dp"
+                android:text="Exporte suas viagens para transferir para outro celular ou importe o arquivo de backup recebido."
+                android:textColor="@android:color/darker_gray"
+                android:textSize="12sp" />
+
+            <LinearLayout
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:orientation="horizontal"
+                android:layout_marginBottom="32dp">
+
+                <androidx.appcompat.widget.AppCompatButton
+                    android:id="@+id/btExportarDados"
+                    android:layout_width="0dp"
+                    android:layout_height="wrap_content"
+                    android:layout_weight="1"
+                    android:layout_marginEnd="6dp"
+                    android:background="@drawable/bt_secondary_selector"
+                    android:onClick="exportarDados"
+                    android:text="Exportar Dados"
+                    android:textAllCaps="true"
+                    android:textColor="#1B5E20"
+                    android:textStyle="bold" />
+
+                <androidx.appcompat.widget.AppCompatButton
+                    android:id="@+id/btImportarDados"
+                    android:layout_width="0dp"
+                    android:layout_height="wrap_content"
+                    android:layout_weight="1"
+                    android:layout_marginStart="6dp"
+                    android:background="@drawable/bt_secondary_selector"
+                    android:onClick="importarDados"
+                    android:text="Importar Dados"
+                    android:textAllCaps="true"
+                    android:textColor="#1B5E20"
+                    android:textStyle="bold" />
+            </LinearLayout>
 
             <androidx.appcompat.widget.AppCompatButton
                 android:id="@+id/btSalvarConfig"
