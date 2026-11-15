@@ -124,6 +124,7 @@ public class BackupController {
             item.put("valorHoraEspera", v.getValorHoraEspera());
             item.put("classificacao", v.getClassificacao() != null ? v.getClassificacao() : "Comum");
             item.put("valorTotal", v.getValorTotal());
+            item.put("solicitante", v.getSolicitante() != null ? v.getSolicitante() : "");
             jsonViagens.put(item);
         }
         jsonRoot.put("viagens", jsonViagens);
@@ -214,6 +215,7 @@ public class BackupController {
                 v.setValorHoraEspera((float) item.optDouble("valorHoraEspera", 0.0));
                 v.setClassificacao(item.optString("classificacao", "Comum"));
                 v.setValorTotal((float) item.optDouble("valorTotal", 0.0));
+                v.setSolicitante(item.optString("solicitante", ""));
 
                 listaViagens.add(v);
             }

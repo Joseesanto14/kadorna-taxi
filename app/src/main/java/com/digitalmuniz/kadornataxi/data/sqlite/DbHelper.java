@@ -6,7 +6,7 @@ import android.database.sqlite.SQLiteOpenHelper;
 
 public class DbHelper extends SQLiteOpenHelper {
     private static final String DATABASE_NAME = "kadorna_taxi.db";
-    private static final int DATABASE_VERSION = 4;
+    private static final int DATABASE_VERSION = 5;
 
     public DbHelper(Context context) {
         super(context, DbHelper.DATABASE_NAME, null, DATABASE_VERSION);
@@ -31,6 +31,9 @@ public class DbHelper extends SQLiteOpenHelper {
             db.execSQL("ALTER TABLE " + Configuracao.NOME_TABELA + " ADD COLUMN " + Configuracao.TELEFONE + " TEXT");
             db.execSQL("ALTER TABLE " + Configuracao.NOME_TABELA + " ADD COLUMN " + Configuracao.EMAIL + " TEXT");
         }
+        if (oldVersion < 5) {
+            db.execSQL("ALTER TABLE " + Viagem.NOME_TABELA + " ADD COLUMN " + Viagem.SOLICITANTE + " TEXT DEFAULT ''");
+        }
     }
 
     // ---------- Tabela Viagem ----------
@@ -51,6 +54,7 @@ public class DbHelper extends SQLiteOpenHelper {
         public static final String VALOR_HORA_ESPERA = "valor_hora_espera";
         public static final String CLASSIFICACAO = "classificacao";
         public static final String VALOR_TOTAL = "valor_total";
+        public static final String SOLICITANTE = "solicitante";
 
         public static final String CRIAR_TABELA = "CREATE TABLE " + NOME_TABELA + "(" +
                 ID + " INTEGER PRIMARY KEY AUTOINCREMENT, " +
@@ -66,7 +70,8 @@ public class DbHelper extends SQLiteOpenHelper {
                 HORA_ESPERA + " REAL, " +
                 VALOR_HORA_ESPERA + " REAL, " +
                 CLASSIFICACAO + " TEXT, " +
-                VALOR_TOTAL + " REAL" +
+                VALOR_TOTAL + " REAL, " +
+                SOLICITANTE + " TEXT DEFAULT ''" +
                 ");";
     }
 

@@ -45,7 +45,8 @@ public class ViagensController {
         for (Viagem v : viagensEmMemoria) {
             boolean matchesBusca = busca.isEmpty() ||
                     (v.getClassificacao() != null && v.getClassificacao().toLowerCase().contains(busca)) ||
-                    (v.getDescricao() != null && v.getDescricao().toLowerCase().contains(busca));
+                    (v.getDescricao() != null && v.getDescricao().toLowerCase().contains(busca)) ||
+                    (v.getSolicitante() != null && v.getSolicitante().toLowerCase().contains(busca));
 
             boolean matchesChip = !filtrarApenasSeparadas ||
                     (v.getClassificacao() != null && !v.getClassificacao().equals("Comum"));

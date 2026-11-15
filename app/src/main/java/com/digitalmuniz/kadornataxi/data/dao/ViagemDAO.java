@@ -112,6 +112,8 @@ public class ViagemDAO {
                 viagem.getClassificacao());
         values.put(DbHelper.Viagem.VALOR_TOTAL,
                 viagem.getValorTotal());
+        values.put(DbHelper.Viagem.SOLICITANTE,
+                viagem.getSolicitante());
 
         return database.insert(DbHelper.Viagem.NOME_TABELA, null, values);
     }
@@ -181,6 +183,7 @@ public class ViagemDAO {
         values.put(DbHelper.Viagem.VALOR_HORA_ESPERA, viagem.getValorHoraEspera());
         values.put(DbHelper.Viagem.CLASSIFICACAO, viagem.getClassificacao());
         values.put(DbHelper.Viagem.VALOR_TOTAL, viagem.getValorTotal());
+        values.put(DbHelper.Viagem.SOLICITANTE, viagem.getSolicitante());
 
         int linhasAfetadas = database.update(DbHelper.Viagem.NOME_TABELA, values,
                 DbHelper.Viagem.ID + " = ?", new String[]{String.valueOf(viagem.getId())});
@@ -312,6 +315,10 @@ public class ViagemDAO {
     }
 
     private Viagem cursorToViagem(Cursor cursor) {
+        int idxSolicitante = cursor.getColumnIndex(DbHelper.Viagem.SOLICITANTE);
+        String solicitante = (idxSolicitante != -1 && !cursor.isNull(idxSolicitante))
+                ? cursor.getString(idxSolicitante)
+                : "";
 
         return new Viagem(
                 cursor.getLong(cursor.getColumnIndexOrThrow(DbHelper.Viagem.ID)),
@@ -327,7 +334,8 @@ public class ViagemDAO {
                 cursor.getFloat(cursor.getColumnIndexOrThrow(DbHelper.Viagem.HORA_ESPERA)),
                 cursor.getFloat(cursor.getColumnIndexOrThrow(DbHelper.Viagem.VALOR_HORA_ESPERA)),
                 cursor.getString(cursor.getColumnIndexOrThrow(DbHelper.Viagem.CLASSIFICACAO)),
-                cursor.getFloat(cursor.getColumnIndexOrThrow(DbHelper.Viagem.VALOR_TOTAL))
+                cursor.getFloat(cursor.getColumnIndexOrThrow(DbHelper.Viagem.VALOR_TOTAL)),
+                solicitante
         );
     }
 }

@@ -1,82 +1,103 @@
 package com.digitalmuniz.kadornataxi.model.enums
 
+import android.text.Layout
 import com.digitalmuniz.kadornataxi.model.entities.Viagem
+import java.text.DecimalFormat
+import java.text.DecimalFormatSymbols
 import java.util.Locale
 
-enum class ColunasPdf(nome : String, larguraCm: Float) {
-    /**
-     * Enum that represents the columns of the PDF report.
-     */
-
-    DIA("Dia", 1.8f) {
+/**
+ * Representa as colunas da tabela do Relatório PDF em formato A4 Paisagem (842 x 595 pt).
+ * Soma total das larguras: 28,00 cm (793,8 pt), cabendo perfeitamente na área útil de 794 pt
+ * (842 pt de largura total - 48 pt de margens laterais).
+ */
+enum class ColunasPdf(
+    val nome: String,
+    larguraCm: Float,
+    val alinhamento: Layout.Alignment
+) {
+    DIA("Dia", 1.25f, Layout.Alignment.ALIGN_CENTER) {
         override fun extrairDado(viagem: Viagem): String {
-            return viagem.diaMes
-
+            return try {
+                viagem.diaMes ?: "-"
+            } catch (_: Exception) {
+                viagem.data.orEmpty().ifBlank { "-" }
+            }
         }
     },
-    HORA("Hora",1.11f) {
+    HORA("Hora", 1.15f, Layout.Alignment.ALIGN_CENTER) {
         override fun extrairDado(viagem: Viagem): String {
-            return viagem.hora
+            return viagem.hora.orEmpty().ifBlank { "-" }
         }
     },
-    ORIGEM ("Origem",2.5f) {
+    ORIGEM("Origem", 2.40f, Layout.Alignment.ALIGN_NORMAL) {
         override fun extrairDado(viagem: Viagem): String {
-            return viagem.origem
+            return viagem.origem.orEmpty().ifBlank { "-" }
         }
     },
-    DESTINO("Destino",2.93f) {
+    DESTINO("Destino", 2.60f, Layout.Alignment.ALIGN_NORMAL) {
         override fun extrairDado(viagem: Viagem): String {
-            return viagem.destino
+            return viagem.destino.orEmpty().ifBlank { "-" }
         }
     },
-    DESCRICAO("Descrição",4.68f) {
+    DESCRICAO("Descrição", 4.10f, Layout.Alignment.ALIGN_NORMAL) {
         override fun extrairDado(viagem: Viagem): String {
-            return viagem.descricao
+            return viagem.descricao.orEmpty().ifBlank { "-" }
         }
     },
-    KMS_RODADOS("Kms Rodados", 1.8f) {
+    SOLICITANTE("Solicitante", 2.40f, Layout.Alignment.ALIGN_NORMAL) {
         override fun extrairDado(viagem: Viagem): String {
-            return String.format(Locale.getDefault(), "%.1f km", viagem.kmsRodados)
+            return viagem.solicitante.orEmpty().trim().ifBlank { "-" }
         }
     },
-    VALOR_KMS("Valor Kms", 2f) {
+    KMS_RODADOS("Kms", 1.65f, Layout.Alignment.ALIGN_CENTER) {
         override fun extrairDado(viagem: Viagem): String {
-            return String.format(Locale.getDefault(), "R$ %.2f", viagem.valorKms)
+            return String.format(LOCALE_PT_BR, "%.1f km", viagem.kmsRodados)
         }
     },
-    VALOR_SERVICO("Valor Serviço", 2.1f) {
+    VALOR_KMS("Valor Kms", 2.15f, Layout.Alignment.ALIGN_OPPOSITE) {
         override fun extrairDado(viagem: Viagem): String {
-            return String.format(Locale.getDefault(), "R$ %.2f", viagem.valorServico)
+            return formatarMoeda(viagem.valorKms.toDouble())
         }
     },
-    HORAS_ESPERA("Espera (h)",1.9f) {
+    VALOR_SERVICO("Valor Serv.", 2.15f, Layout.Alignment.ALIGN_OPPOSITE) {
         override fun extrairDado(viagem: Viagem): String {
-            return String.format(Locale.getDefault(), "%.2f", viagem.horaEspera)
+            return formatarMoeda(viagem.valorServico.toDouble())
         }
     },
-    VALOR_ESPERA("Valor Espera", 1.8f) {
+    HORAS_ESPERA("Espera (h)", 1.65f, Layout.Alignment.ALIGN_CENTER) {
         override fun extrairDado(viagem: Viagem): String {
-            return String.format(Locale.getDefault(), "R$ %.2f", viagem.valorHoraEspera)
+            return String.format(LOCALE_PT_BR, "%.2f", viagem.horaEspera)
         }
     },
-    VALOR_TOTAL("Valor Total",2.3f) {
+    VALOR_ESPERA("Valor Esp.", 2.10f, Layout.Alignment.ALIGN_OPPOSITE) {
         override fun extrairDado(viagem: Viagem): String {
-            return String.format(Locale.getDefault(), "R$ %.2f", viagem.valorTotal)
+            return formatarMoeda(viagem.valorHoraEspera.toDouble())
         }
     },
-    MOTORISTA("Motorista",1.8f) {
+    VALOR_TOTAL("Valor Total", 2.30f, Layout.Alignment.ALIGN_OPPOSITE) {
         override fun extrairDado(viagem: Viagem): String {
-            return  viagem.motorista
+            return formatarMoeda(viagem.valorTotal.toDouble())
+        }
+    },
+    MOTORISTA("Motorista", 2.10f, Layout.Alignment.ALIGN_NORMAL) {
+        override fun extrairDado(viagem: Viagem): String {
+            return viagem.motorista.orEmpty().ifBlank { "-" }
         }
     };
 
-    val larguraPt = larguraCm * 28.35f
-    val nome = nome
+    val larguraPt: Float = larguraCm * 28.35f
 
-    fun getMetadeLargura() : Float {
-        return larguraPt / 2f
+    fun getMetadeLargura(): Float = larguraPt / 2f
+
+    abstract fun extrairDado(viagem: Viagem): String
+
+    companion object {
+        val LOCALE_PT_BR: Locale = Locale("pt", "BR")
+
+        fun formatarMoeda(valor: Double): String {
+            val df = DecimalFormat("#,##0.00", DecimalFormatSymbols(LOCALE_PT_BR))
+            return "R$ " + df.format(valor)
+        }
     }
-
-    abstract fun extrairDado(viagem: Viagem) : String
-
 }

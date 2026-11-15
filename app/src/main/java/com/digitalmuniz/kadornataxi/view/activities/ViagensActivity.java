@@ -27,9 +27,14 @@ import com.digitalmuniz.kadornataxi.controller.RelatorioPdfGenerator;
 import com.digitalmuniz.kadornataxi.view.interfaces.OnViagemActionListener;
 import com.google.android.material.chip.Chip;
 
+import java.io.File;
 import java.util.ArrayList;
 import java.util.Comparator;
 import java.util.List;
+import java.util.concurrent.ExecutorService;
+import java.util.concurrent.Executors;
+import android.os.Handler;
+import android.os.Looper;
 
 public class ViagensActivity extends AppCompatActivity {
 
@@ -38,6 +43,8 @@ public class ViagensActivity extends AppCompatActivity {
     private SearchView searchView;
     private Chip chipSeparadas;
     private List<Viagem> todasAsViagensOriginal = new ArrayList<>();
+    private final ExecutorService pdfExecutor = Executors.newSingleThreadExecutor();
+    private final Handler mainHandler = new Handler(Looper.getMainLooper());
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
@@ -111,13 +118,15 @@ public class ViagensActivity extends AppCompatActivity {
                 String motorista = v.getMotorista() != null ? v.getMotorista().toLowerCase() : "";
                 String descricao = v.getDescricao() != null ? v.getDescricao().toLowerCase() : "";
                 String classificacao = v.getClassificacao() != null ? v.getClassificacao().toLowerCase() : "";
+                String solicitante = v.getSolicitante() != null ? v.getSolicitante().toLowerCase() : "";
 
                 if (destino.contains(textoBusca) ||
                         origem.contains(textoBusca) ||
                         data.contains(textoBusca) ||
                         descricao.contains(textoBusca) ||
                         motorista.contains(textoBusca) ||
-                        classificacao.contains(textoBusca)
+                        classificacao.contains(textoBusca) ||
+                        solicitante.contains(textoBusca)
                 )
                 {
                     matchesBusca = true;
@@ -186,13 +195,27 @@ public class ViagensActivity extends AppCompatActivity {
 
         RelatorioPdfGenerator gerador = new RelatorioPdfGenerator(this, viagensOrdenadas, config, mesAno);
 
-        try {
-            gerador.gerarRelatorio();
-            Toast.makeText(this, "Relatório gerado com sucesso!", Toast.LENGTH_LONG).show();
-        } catch (Exception e) {
-            Toast.makeText(this, "Erro ao gerar PDF: " + e.getMessage(), Toast.LENGTH_LONG).show();
-            e.printStackTrace();
-        }
+        Toast.makeText(this, "Gerando relatório PDF...", Toast.LENGTH_SHORT).show();
+        pdfExecutor.execute(() -> {
+            try {
+                File arquivo = gerador.gerarArquivoPdf();
+                mainHandler.post(() -> {
+                    Toast.makeText(ViagensActivity.this, "Relatório gerado com sucesso!", Toast.LENGTH_LONG).show();
+                    gerador.abrirDocumento(arquivo);
+                });
+            } catch (Exception e) {
+                mainHandler.post(() ->
+                        Toast.makeText(ViagensActivity.this, "Erro ao gerar PDF: " + e.getMessage(), Toast.LENGTH_LONG).show()
+                );
+                e.printStackTrace();
+            }
+        });
+    }
+
+    @Override
+    protected void onDestroy() {
+        super.onDestroy();
+        pdfExecutor.shutdown();
     }
 
     // --- MÉTODOS DE BOTÕES (Chamados pelo XML) ---
