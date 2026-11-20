@@ -77,7 +77,7 @@ public class DashboardDAO {
     public DashboardResumoDTO buscarResumoPorPeriodo(String ano, String mesOuNull) {
         PeriodoIntervalo intervalo = criarIntervaloPeriodo(ano, mesOuNull);
         if (intervalo == null) {
-            return new DashboardResumoDTO(0, 0, 0.0, 0.0, null, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0);
+            return new DashboardResumoDTO(0, 0, 0.0, 0.0, null, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0, 0, 0.0);
         }
 
         SQLiteDatabase db = dbHelper.getReadableDatabase();
@@ -88,8 +88,7 @@ public class DashboardDAO {
                 "COALESCE(SUM(" + DbHelper.Viagem.KMS_RODADOS + "), 0.0) AS total_kms, " +
                 "COALESCE(SUM(" + DbHelper.Viagem.VALOR_KM + "), 0.0) AS total_valor_km, " +
                 "COALESCE(SUM(" + DbHelper.Viagem.HORA_ESPERA + "), 0.0) AS total_horas_espera, " +
-                "COALESCE(SUM(" + DbHelper.Viagem.VALOR_HORA_ESPERA + "), 0.0) AS total_valor_espera, " +
-                "COALESCE(SUM(" + DbHelper.Viagem.VALOR_SERVICO + "), 0.0) AS total_valor_servico " +
+                "COALESCE(SUM(" + DbHelper.Viagem.VALOR_HORA_ESPERA + "), 0.0) AS total_valor_espera " +
                 "FROM " + DbHelper.Viagem.NOME_TABELA + " " +
                 "WHERE " + DbHelper.Viagem.DATA + " >= ? AND " + DbHelper.Viagem.DATA + " < ?";
 
@@ -100,7 +99,6 @@ public class DashboardDAO {
         double totalValorKm = 0.0;
         double totalHorasEspera = 0.0;
         double totalValorEspera = 0.0;
-        double totalValorServico = 0.0;
 
         try (Cursor cursor = db.rawQuery(sqlAtual, new String[]{intervalo.inicio, intervalo.fimExclusivo})) {
             if (cursor != null && cursor.moveToFirst()) {
@@ -111,9 +109,11 @@ public class DashboardDAO {
                 totalValorKm = cursor.getDouble(4);
                 totalHorasEspera = cursor.getDouble(5);
                 totalValorEspera = cursor.getDouble(6);
-                totalValorServico = cursor.getDouble(7);
             }
         }
+
+        ServicoResumoRaw servicosResumo = buscarResumoServicosPorPeriodo(
+                db, intervalo.inicio, intervalo.fimExclusivo);
 
         double faturamentoAnterior = buscarFaturamentoSimples(
                 db, intervalo.anteriorInicio, intervalo.anteriorFimExclusivo);
@@ -125,6 +125,9 @@ public class DashboardDAO {
         double ticketMedio = totalViagens > 0 ? faturamentoTotal / totalViagens : 0.0;
         double mediaReaisPorKm = totalKms > 0.0 ? faturamentoTotal / totalKms : 0.0;
         double mediaDiaria = diasTrabalhados > 0 ? faturamentoTotal / diasTrabalhados : 0.0;
+        double mediaPorServico = servicosResumo.totalServicos > 0
+                ? servicosResumo.totalValorServico / servicosResumo.totalServicos
+                : 0.0;
 
         return new DashboardResumoDTO(
                 totalViagens,
@@ -139,7 +142,10 @@ public class DashboardDAO {
                 totalValorKm,
                 totalHorasEspera,
                 totalValorEspera,
-                totalValorServico
+                servicosResumo.totalValorServico,
+                servicosResumo.totalServicos,
+                servicosResumo.viagensComServico,
+                mediaPorServico
         );
     }
 
@@ -251,6 +257,22 @@ public class DashboardDAO {
         return 0.0;
     }
 
+    private ServicoResumoRaw buscarResumoServicosPorPeriodo(SQLiteDatabase db, String inicio, String fimExclusivo) {
+        String sql = "SELECT " +
+                "COUNT(*), " +
+                "COUNT(DISTINCT s." + DbHelper.Servico.VIAGEM_ID + "), " +
+                "COALESCE(SUM(s." + DbHelper.Servico.VALOR + "), 0.0) " +
+                "FROM " + DbHelper.Servico.NOME_TABELA + " s " +
+                "INNER JOIN " + DbHelper.Viagem.NOME_TABELA + " v ON v." + DbHelper.Viagem.ID + " = s." + DbHelper.Servico.VIAGEM_ID + " " +
+                "WHERE v." + DbHelper.Viagem.DATA + " >= ? AND v." + DbHelper.Viagem.DATA + " < ?";
+        try (Cursor cursor = db.rawQuery(sql, new String[]{inicio, fimExclusivo})) {
+            if (cursor != null && cursor.moveToFirst()) {
+                return new ServicoResumoRaw(cursor.getInt(0), cursor.getInt(1), cursor.getDouble(2));
+            }
+        }
+        return new ServicoResumoRaw(0, 0, 0.0);
+    }
+
     private PeriodoIntervalo criarIntervaloPeriodo(String ano, String mesOuNull) {
         if (!isAnoValido(ano)) {
             return null;
@@ -322,6 +344,18 @@ public class DashboardDAO {
             this.fimExclusivo = fimExclusivo;
             this.anteriorInicio = anteriorInicio;
             this.anteriorFimExclusivo = anteriorFimExclusivo;
+        }
+    }
+
+    private static class ServicoResumoRaw {
+        final int totalServicos;
+        final int viagensComServico;
+        final double totalValorServico;
+
+        ServicoResumoRaw(int totalServicos, int viagensComServico, double totalValorServico) {
+            this.totalServicos = totalServicos;
+            this.viagensComServico = viagensComServico;
+            this.totalValorServico = totalValorServico;
         }
     }
 

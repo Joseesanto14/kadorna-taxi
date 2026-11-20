@@ -68,6 +68,10 @@ public class DashboardFragment extends Fragment {
     private TextView txtKpiValorEspera;
     private TextView txtKpiMediaDiaria;
     private TextView txtKpiDiasTrabalhados;
+    private TextView txtKpiTotalServicos;
+    private TextView txtKpiQtdServicos;
+    private TextView txtKpiMediaServico;
+    private TextView txtKpiViagensComServico;
 
     private TextView txtComposicaoKm;
     private LinearProgressIndicator progressComposicaoKm;
@@ -210,6 +214,10 @@ public class DashboardFragment extends Fragment {
         txtKpiValorEspera = null;
         txtKpiMediaDiaria = null;
         txtKpiDiasTrabalhados = null;
+        txtKpiTotalServicos = null;
+        txtKpiQtdServicos = null;
+        txtKpiMediaServico = null;
+        txtKpiViagensComServico = null;
         txtComposicaoKm = null;
         progressComposicaoKm = null;
         txtComposicaoEspera = null;
@@ -254,6 +262,10 @@ public class DashboardFragment extends Fragment {
         txtKpiValorEspera = root.findViewById(R.id.txtKpiValorEspera);
         txtKpiMediaDiaria = root.findViewById(R.id.txtKpiMediaDiaria);
         txtKpiDiasTrabalhados = root.findViewById(R.id.txtKpiDiasTrabalhados);
+        txtKpiTotalServicos = root.findViewById(R.id.txtKpiTotalServicos);
+        txtKpiQtdServicos = root.findViewById(R.id.txtKpiQtdServicos);
+        txtKpiMediaServico = root.findViewById(R.id.txtKpiMediaServico);
+        txtKpiViagensComServico = root.findViewById(R.id.txtKpiViagensComServico);
 
         txtComposicaoKm = root.findViewById(R.id.txtComposicaoKm);
         progressComposicaoKm = root.findViewById(R.id.progressComposicaoKm);
@@ -369,6 +381,23 @@ public class DashboardFragment extends Fragment {
         int dias = resumo.getDiasTrabalhados();
         String labelDias = dias == 1 ? "1 dia trabalhado" : dias + " dias trabalhados";
         txtKpiDiasTrabalhados.setText(labelDias);
+
+        txtKpiTotalServicos.setText(FormatadorDashboard.formatarMoeda(resumo.getTotalValorServico()));
+        int totalServicos = resumo.getTotalServicos();
+        String labelQtdServicos = totalServicos == 1 ? "1 serviço" : totalServicos + " serviços";
+        txtKpiQtdServicos.setText(labelQtdServicos);
+
+        txtKpiMediaServico.setText(FormatadorDashboard.formatarMoeda(resumo.getMediaPorServico()));
+        int viagensComServico = resumo.getViagensComServico();
+        String labelViagensServico;
+        if (viagensComServico <= 0) {
+            labelViagensServico = "nenhuma viagem";
+        } else if (viagensComServico == 1) {
+            labelViagensServico = "em 1 viagem";
+        } else {
+            labelViagensServico = "em " + viagensComServico + " viagens";
+        }
+        txtKpiViagensComServico.setText(labelViagensServico);
 
         renderizarComposicao(resumo);
 

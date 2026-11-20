@@ -14,6 +14,9 @@ public class DashboardResumoDTO {
     private final double totalHorasEspera;
     private final double totalValorEspera;
     private final double totalValorServico;
+    private final int totalServicos;
+    private final int viagensComServico;
+    private final double mediaPorServico;
 
     public DashboardResumoDTO(
             int totalViagens,
@@ -30,6 +33,44 @@ public class DashboardResumoDTO {
             double totalValorEspera,
             double totalValorServico
     ) {
+        this(
+                totalViagens,
+                diasTrabalhados,
+                faturamentoTotal,
+                faturamentoPeriodoAnterior,
+                variacaoPercentual,
+                ticketMedio,
+                totalKms,
+                mediaReaisPorKm,
+                mediaDiaria,
+                totalValorKm,
+                totalHorasEspera,
+                totalValorEspera,
+                totalValorServico,
+                0,
+                0,
+                0.0
+        );
+    }
+
+    public DashboardResumoDTO(
+            int totalViagens,
+            int diasTrabalhados,
+            double faturamentoTotal,
+            double faturamentoPeriodoAnterior,
+            Double variacaoPercentual,
+            double ticketMedio,
+            double totalKms,
+            double mediaReaisPorKm,
+            double mediaDiaria,
+            double totalValorKm,
+            double totalHorasEspera,
+            double totalValorEspera,
+            double totalValorServico,
+            int totalServicos,
+            int viagensComServico,
+            double mediaPorServico
+    ) {
         this.totalViagens = totalViagens;
         this.diasTrabalhados = diasTrabalhados;
         this.faturamentoTotal = faturamentoTotal;
@@ -43,6 +84,9 @@ public class DashboardResumoDTO {
         this.totalHorasEspera = totalHorasEspera;
         this.totalValorEspera = totalValorEspera;
         this.totalValorServico = totalValorServico;
+        this.totalServicos = totalServicos;
+        this.viagensComServico = viagensComServico;
+        this.mediaPorServico = mediaPorServico;
     }
 
     public int getTotalViagens() {
@@ -95,5 +139,17 @@ public class DashboardResumoDTO {
 
     public double getTotalValorServico() {
         return totalValorServico;
+    }
+
+    public int getTotalServicos() {
+        return totalServicos;
+    }
+
+    public int getViagensComServico() {
+        return viagensComServico;
+    }
+
+    public double getMediaPorServico() {
+        return mediaPorServico;
     }
 }

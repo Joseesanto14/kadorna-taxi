@@ -15,6 +15,7 @@ import com.digitalmuniz.kadornataxi.data.dao.ConfiguracaoDAO;
 import com.digitalmuniz.kadornataxi.data.dao.ViagemDAO;
 import com.digitalmuniz.kadornataxi.data.sqlite.DbHelper;
 import com.digitalmuniz.kadornataxi.model.entities.Configuracao;
+import com.digitalmuniz.kadornataxi.model.entities.Servico;
 import com.digitalmuniz.kadornataxi.model.entities.Viagem;
 import com.digitalmuniz.kadornataxi.view.activities.ConfiguracaoActivity;
 import com.digitalmuniz.kadornataxi.view.activities.SolicitacaoActivity;
@@ -121,6 +122,11 @@ public class ViagensNavigationAndDashboardTest {
         TextView txtKpiReaisPorKm = activity.findViewById(R.id.txtKpiReaisPorKm);
         TextView txtKpiHorasEspera = activity.findViewById(R.id.txtKpiHorasEspera);
         TextView txtKpiMediaDiaria = activity.findViewById(R.id.txtKpiMediaDiaria);
+        TextView txtKpiTotalServicos = activity.findViewById(R.id.txtKpiTotalServicos);
+        TextView txtKpiQtdServicos = activity.findViewById(R.id.txtKpiQtdServicos);
+        TextView txtKpiMediaServico = activity.findViewById(R.id.txtKpiMediaServico);
+        TextView txtKpiViagensComServico = activity.findViewById(R.id.txtKpiViagensComServico);
+        TextView txtComposicaoServico = activity.findViewById(R.id.txtComposicaoServico);
         ChipGroup chipGroupAnos = activity.findViewById(R.id.chipGroupAnos);
         ChipGroup chipGroupMeses = activity.findViewById(R.id.chipGroupMeses);
         RecyclerView recyclerClassificacao = activity.findViewById(R.id.recyclerClassificacao);
@@ -130,10 +136,35 @@ public class ViagensNavigationAndDashboardTest {
         assertEquals("R$ 5,00/km", txtKpiReaisPorKm.getText().toString());
         assertEquals("1h 30m", txtKpiHorasEspera.getText().toString());
         assertEquals("R$ 250,00", txtKpiMediaDiaria.getText().toString());
+        assertEquals("R$ 20,00", txtKpiTotalServicos.getText().toString());
+        assertEquals("2 serviços", txtKpiQtdServicos.getText().toString());
+        assertEquals("R$ 10,00", txtKpiMediaServico.getText().toString());
+        assertEquals("em 1 viagem", txtKpiViagensComServico.getText().toString());
+        assertEquals("R$ 20,00 (4,0%)", txtComposicaoServico.getText().toString());
         assertTrue(chipGroupAnos.getChildCount() >= 1);
         assertTrue(chipGroupMeses.getChildCount() >= 2);
         assertNotNull(recyclerClassificacao.getAdapter());
         assertEquals(2, recyclerClassificacao.getAdapter().getItemCount());
+    }
+
+    @Test
+    public void dashboardSemServicos_renderizaKpisDeServicoZerados() throws Exception {
+        viagemDAO.inserirLote(Arrays.asList(
+                new Viagem(0L, "Itu", "2026-03-01", "09:00", "Sorocaba", "Viagem 1",
+                        50f, 150f, 0f, "Marcelo", 0f, 0f, "Comum", 150f)
+        ), true);
+        activityController = Robolectric.buildActivity(ViagensActivity.class).setup();
+        ViagensActivity activity = activityController.get();
+
+        BottomNavigationView bottomNav = activity.findViewById(R.id.bottomNavigation);
+        bottomNav.setSelectedItemId(R.id.nav_dashboard);
+
+        aguardarViewVisivel(activity.findViewById(R.id.dashboardContent));
+
+        assertEquals("R$ 0,00", ((TextView) activity.findViewById(R.id.txtKpiTotalServicos)).getText().toString());
+        assertEquals("0 serviços", ((TextView) activity.findViewById(R.id.txtKpiQtdServicos)).getText().toString());
+        assertEquals("R$ 0,00", ((TextView) activity.findViewById(R.id.txtKpiMediaServico)).getText().toString());
+        assertEquals("nenhuma viagem", ((TextView) activity.findViewById(R.id.txtKpiViagensComServico)).getText().toString());
     }
 
     @Test
@@ -177,12 +208,15 @@ public class ViagensNavigationAndDashboardTest {
     }
 
     private void inserirDadosExemplo() {
-        viagemDAO.inserirLote(Arrays.asList(
-                new Viagem(0L, "Itu", "2026-03-01", "09:00", "Sorocaba", "Viagem 1",
-                        60f, 240f, 20f, "Marcelo", 1.0f, 40f, "Quartzolit", 300f),
-                new Viagem(0L, "Itu", "2026-03-02", "14:00", "Campinas", "Viagem 2",
-                        40f, 180f, 0f, "Marcelo", 0.5f, 20f, "Comum", 200f)
-        ), true);
+        Viagem viagem1 = new Viagem(0L, "Itu", "2026-03-01", "09:00", "Sorocaba", "Viagem 1",
+                60f, 240f, 20f, "Marcelo", 1.0f, 40f, "Quartzolit", 300f);
+        viagem1.setServicos(Arrays.asList(
+                new Servico("Pedágio", 12f),
+                new Servico("Estacionamento", 8f)
+        ));
+        Viagem viagem2 = new Viagem(0L, "Itu", "2026-03-02", "14:00", "Campinas", "Viagem 2",
+                40f, 180f, 0f, "Marcelo", 0.5f, 20f, "Comum", 200f);
+        viagemDAO.inserirLote(Arrays.asList(viagem1, viagem2), true);
     }
 
     private void aguardarViewVisivel(View view) throws InterruptedException {
