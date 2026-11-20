@@ -29,12 +29,17 @@ public class Viagem implements Serializable {
     private float valorHoraEspera;
     private String classificacao;
     private float valorTotal;
+    private String solicitante = "";
 
     // --------------- construtores ---------------
 
     public Viagem() {}
 
     public Viagem(long id, String origem, String data, String hora, String destino, String descricao, float kmsRodados, float valorKms, float valorServico, String motorista, float horaEspera, float valorHoraEspera, String classificacao, float valorTotal) {
+        this(id, origem, data, hora, destino, descricao, kmsRodados, valorKms, valorServico, motorista, horaEspera, valorHoraEspera, classificacao, valorTotal, "");
+    }
+
+    public Viagem(long id, String origem, String data, String hora, String destino, String descricao, float kmsRodados, float valorKms, float valorServico, String motorista, float horaEspera, float valorHoraEspera, String classificacao, float valorTotal, String solicitante) {
         this.id = id;
         this.origem = origem;
         this.data = data;
@@ -49,9 +54,14 @@ public class Viagem implements Serializable {
         this.valorHoraEspera = valorHoraEspera;
         this.classificacao = classificacao;
         this.valorTotal = valorTotal;
+        this.solicitante = solicitante != null ? solicitante : "";
     }
 
     public Viagem(String origem, String data, String hora, String destino, String descricao, float kmsRodados, float horaEspera, String motorista, String cliente, Context context, float valorServico) {
+        this(origem, data, hora, destino, descricao, kmsRodados, horaEspera, motorista, cliente, context, valorServico, "");
+    }
+
+    public Viagem(String origem, String data, String hora, String destino, String descricao, float kmsRodados, float horaEspera, String motorista, String cliente, Context context, float valorServico, String solicitante) {
         this.origem = origem;
         this.data = data;
         this.hora = hora;
@@ -62,6 +72,7 @@ public class Viagem implements Serializable {
         this.motorista = motorista;
         this.horaEspera = horaEspera;
         this.classificacao = cliente;
+        this.solicitante = solicitante != null ? solicitante : "";
 
         Configuracao config = new ConfiguracaoDAO(context).getConfiguracao();
         valorKms = (kmsRodados * config.getValorKmRodado());
@@ -241,6 +252,14 @@ public class Viagem implements Serializable {
 
     public void setValorTotal(float valorTotal) {
         this.valorTotal = valorTotal;
+    }
+
+    public String getSolicitante() {
+        return solicitante != null ? solicitante : "";
+    }
+
+    public void setSolicitante(String solicitante) {
+        this.solicitante = solicitante != null ? solicitante : "";
     }
 }
 

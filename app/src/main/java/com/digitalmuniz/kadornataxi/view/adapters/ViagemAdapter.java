@@ -52,6 +52,15 @@ public class ViagemAdapter extends RecyclerView.Adapter<ViagemAdapter.ViewHolder
 
         holder.txtDescricao.setText(v.getDescricao());
 
+        String solicitante = v.getSolicitante();
+        if (solicitante != null && !solicitante.trim().isEmpty()) {
+            String textoSolicitante = "Solicitante: " + solicitante.trim();
+            holder.txtSolicitante.setText(textoSolicitante);
+            holder.txtSolicitante.setVisibility(View.VISIBLE);
+        } else {
+            holder.txtSolicitante.setVisibility(View.GONE);
+        }
+
         holder.btnEditarViagem.setOnClickListener(view -> listener.onEditar(v));
         holder.btnExcluirViagem.setOnClickListener(view -> listener.onExcluir(v));
     }
@@ -62,7 +71,7 @@ public class ViagemAdapter extends RecyclerView.Adapter<ViagemAdapter.ViewHolder
     }
 
     static class ViewHolder extends RecyclerView.ViewHolder {
-        TextView txtDataHora, txtValorTotal, txtOrigem, txtDestino, txtKmsRodados, txtDescricao;
+        TextView txtDataHora, txtValorTotal, txtOrigem, txtDestino, txtKmsRodados, txtDescricao, txtSolicitante;
         ImageButton btnEditarViagem, btnExcluirViagem;
 
         ViewHolder(View itemView) {
@@ -73,6 +82,7 @@ public class ViagemAdapter extends RecyclerView.Adapter<ViagemAdapter.ViewHolder
             txtDestino = itemView.findViewById(R.id.txtDestino);
             txtKmsRodados = itemView.findViewById(R.id.txtKmsRodados);
             txtDescricao = itemView.findViewById(R.id.txtDescricao);
+            txtSolicitante = itemView.findViewById(R.id.txtSolicitante);
             btnEditarViagem = itemView.findViewById(R.id.btnEditarViagem);
             btnExcluirViagem = itemView.findViewById(R.id.btnExcluirViagem);
         }

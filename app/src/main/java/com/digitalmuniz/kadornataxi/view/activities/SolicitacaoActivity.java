@@ -31,7 +31,7 @@ public class SolicitacaoActivity extends AppCompatActivity {
 
     public static final String EXTRA_VIAGEM = "extra_viagem";
 
-    EditText edOrigem, edData, edHora, edDestino, edDescricao, edKmsRodados, edMotorista, edHoraEspera, edCliente;
+    EditText edOrigem, edData, edHora, edDestino, edDescricao, edSolicitante, edKmsRodados, edMotorista, edHoraEspera, edCliente;
     EditText edValorKm, edValorHoraEspera, edValorTotal, edValorServico;
     AppCompatButton btGerarViagem;
 
@@ -73,6 +73,7 @@ public class SolicitacaoActivity extends AppCompatActivity {
         edHora = findViewById(R.id.edHora);
         edDestino = findViewById(R.id.edDestino);
         edDescricao = findViewById(R.id.edDescricao);
+        edSolicitante = findViewById(R.id.edSolicitante);
         edKmsRodados = findViewById(R.id.edKmRodados);
         edValorKm = findViewById(R.id.edValorKm);
         edHoraEspera = findViewById(R.id.edHoraEspera);
@@ -96,6 +97,7 @@ public class SolicitacaoActivity extends AppCompatActivity {
         edOrigem.setText(viagem.getOrigem());
         edDestino.setText(viagem.getDestino());
         edDescricao.setText(viagem.getDescricao());
+        edSolicitante.setText(viagem.getSolicitante());
         edMotorista.setText(viagem.getMotorista());
         edCliente.setText(viagem.getClassificacao());
 
@@ -191,7 +193,8 @@ public class SolicitacaoActivity extends AppCompatActivity {
                 edMotorista.getText().toString().trim(),
                 edCliente.getText().toString().trim(),
                 getApplicationContext(),
-                valorServico
+                valorServico,
+                edSolicitante.getText().toString().trim()
         );
     }
 

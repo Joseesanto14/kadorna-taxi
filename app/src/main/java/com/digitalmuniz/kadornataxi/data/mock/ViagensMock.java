@@ -15,6 +15,7 @@ public class ViagensMock {
     private static final String[] DESCRICOES = {"Viagem de negócios", "Transporte de passageiro", "Consulta médica", "Viagem particular", "Trecho de rotina", "Entrega de documentos"};
     private static final String[] MOTORISTAS = {"Marcelo", "Kadorna", "João", "Ricardo", "Felipe"};
     private static final String[] CLASSIFICACOES = {"Comum", "Quartzolit", "Prefeitura Municipal", "Trecho Especial", "Cliente VIP"};
+    private static final String[] SOLICITANTES = {"Marcos (Encarregado)", "Carlos", "Fernanda (RH)", "Roberto", ""};
 
     /**
      * Gera uma lista de viagens fictícias para teste.
@@ -51,6 +52,7 @@ public class ViagensMock {
             
             String motorista = MOTORISTAS[random.nextInt(MOTORISTAS.length)];
             String classificacao = CLASSIFICACOES[random.nextInt(CLASSIFICACOES.length)];
+            String solicitante = SOLICITANTES[random.nextInt(SOLICITANTES.length)];
             
             float valorTotal = valorKms + valorHoraEspera + valorServico;
 
@@ -68,7 +70,8 @@ public class ViagensMock {
                     horaEspera,
                     valorHoraEspera,
                     classificacao,
-                    valorTotal
+                    valorTotal,
+                    solicitante
             ));
         }
         return lista;
