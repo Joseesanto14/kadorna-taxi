@@ -5,8 +5,10 @@ import android.content.Context;
 import androidx.test.core.app.ApplicationProvider;
 import androidx.test.ext.junit.runners.AndroidJUnit4;
 
+import com.digitalmuniz.kadornataxi.data.dao.ServicoDAO;
 import com.digitalmuniz.kadornataxi.data.dao.ViagemDAO;
 import com.digitalmuniz.kadornataxi.data.sqlite.DbHelper;
+import com.digitalmuniz.kadornataxi.model.entities.Servico;
 import com.digitalmuniz.kadornataxi.model.entities.Viagem;
 import com.digitalmuniz.kadornataxi.view.dto.GrupoViagens;
 import com.digitalmuniz.kadornataxi.view.dto.PaginaViagensResult;
@@ -19,6 +21,8 @@ import org.junit.Test;
 import org.junit.runner.RunWith;
 
 import java.util.ArrayList;
+import java.util.Arrays;
+import java.util.Collections;
 import java.util.HashSet;
 import java.util.List;
 import java.util.Locale;
@@ -291,6 +295,75 @@ public class ViagemDAOPaginacaoTest {
         );
         assertEquals(1, pagina.getItens().size());
         assertEquals("Carla Souza", pagina.getItens().get(0).getSolicitante());
+    }
+
+    @Test
+    public void multiServicos_persisteAtualizaHidrataEmLoteEBuscaPorDescricaoDoServico() {
+        Viagem v1 = criarViagem("Itu", "2026-07-10", "08:00", "São Paulo", "Viagem executiva", "Marcelo", "Quartzolit", 100f);
+        v1.setServicos(Arrays.asList(
+                new Servico("Pedágio Castelo", 22.5f),
+                new Servico("Estacionamento Aeroporto", 45.0f)
+        ));
+
+        Viagem v2 = criarViagem("Itu", "2026-07-11", "09:00", "Campinas", "Viagem simples", "Marcelo", "Comum", 80f);
+
+        long id1 = viagemDAO.inserir(v1);
+        long id2 = viagemDAO.inserir(v2);
+
+        // Hidratação unitária
+        Viagem carregada1 = viagemDAO.getViagemById(id1);
+        assertNotNull(carregada1);
+        assertEquals(2, carregada1.getServicos().size());
+        assertEquals(67.5f, carregada1.getValorTotalServicos(), 0.01f);
+        assertEquals(87.5f, carregada1.getValorTotal(), 0.01f);
+
+        // Busca pelo nome do serviço na tabela servico
+        assertEquals(1, contarResultadosBusca("Castelo"));
+        assertEquals(1, contarResultadosBusca("Estacionamento Aeroporto"));
+        assertEquals(0, contarResultadosBusca("Balsa"));
+
+        // Hidratação em lote na paginação e no PDF
+        PaginaViagensResult pagina = viagemDAO.getPaginaDoGrupo(
+                "2026-07-Quartzolit",
+                new ViagensFiltro("Castelo", false),
+                null,
+                30
+        );
+        assertEquals(1, pagina.getItens().size());
+        assertEquals(2, pagina.getItens().get(0).getServicos().size());
+
+        List<Viagem> paraPdf = viagemDAO.getViagensDoGrupoParaPdf("2026-07-Quartzolit");
+        assertEquals(1, paraPdf.size());
+        assertEquals(2, paraPdf.get(0).getServicos().size());
+
+        // Atualização removendo todos os serviços zera valor_servico e não cria serviço fantasma
+        carregada1.setServicos(Collections.emptyList());
+        assertEquals(1, viagemDAO.update(carregada1));
+
+        Viagem aposLimpeza = viagemDAO.getViagemById(id1);
+        assertNotNull(aposLimpeza);
+        assertTrue(aposLimpeza.getServicos().isEmpty());
+        assertEquals(0f, aposLimpeza.getValorServico(), 0.01f);
+        assertTrue(new ServicoDAO(dbHelper).getServicosPorViagem(id1).isEmpty());
+        assertNotNull(viagemDAO.getViagemById(id2));
+    }
+
+    @Test
+    public void getServicosPorViagens_acimaDe500Ids_fazChunkingSemExcecaoSqlite() {
+        List<Viagem> lote = new ArrayList<>(650);
+        for (int i = 0; i < 650; i++) {
+            Viagem v = criarViagem("Itu", "2026-08-01", "10:00", "Destino " + i, "Desc " + i, "Marcelo", "Comum", 30f);
+            v.setServicos(Collections.singletonList(new Servico("Pedágio " + i, 10f)));
+            lote.add(v);
+        }
+        assertEquals(650, viagemDAO.inserirLote(lote, true));
+
+        List<Viagem> todasParaPdf = viagemDAO.getViagensDoGrupoParaPdf("2026-08");
+        assertEquals(650, todasParaPdf.size());
+        for (Viagem v : todasParaPdf) {
+            assertEquals(1, v.getServicos().size());
+            assertEquals(10f, v.getValorTotalServicos(), 0.01f);
+        }
     }
 
     private int contarResultadosBusca(String query) {

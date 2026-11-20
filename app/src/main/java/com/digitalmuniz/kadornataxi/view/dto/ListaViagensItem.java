@@ -123,11 +123,13 @@ public class ListaViagensItem {
         return viagem.getId() == other.viagem.getId()
                 && Float.compare(viagem.getKmsRodados(), other.viagem.getKmsRodados()) == 0
                 && Float.compare(viagem.getValorTotal(), other.viagem.getValorTotal()) == 0
+                && Float.compare(viagem.getValorTotalServicos(), other.viagem.getValorTotalServicos()) == 0
                 && Objects.equals(viagem.getData(), other.viagem.getData())
                 && Objects.equals(viagem.getHora(), other.viagem.getHora())
                 && Objects.equals(viagem.getOrigem(), other.viagem.getOrigem())
                 && Objects.equals(viagem.getDestino(), other.viagem.getDestino())
                 && Objects.equals(viagem.getDescricao(), other.viagem.getDescricao())
+                && Objects.equals(viagem.getSolicitante(), other.viagem.getSolicitante())
                 && Objects.equals(viagem.getClassificacao(), other.viagem.getClassificacao())
                 && Objects.equals(viagem.getMotorista(), other.viagem.getMotorista());
     }

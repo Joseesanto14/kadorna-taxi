@@ -8,6 +8,7 @@ import android.util.Log;
 import android.widget.Toast;
 
 import com.digitalmuniz.kadornataxi.data.sqlite.DbHelper;
+import com.digitalmuniz.kadornataxi.model.entities.Servico;
 import com.digitalmuniz.kadornataxi.model.entities.Viagem;
 import com.digitalmuniz.kadornataxi.view.dto.GrupoViagens;
 import com.digitalmuniz.kadornataxi.view.dto.PaginaViagensResult;
@@ -19,17 +20,21 @@ import java.time.format.DateTimeParseException;
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.List;
+import java.util.Map;
 
 public class ViagemDAO {
     private static final String TAG = "ViagemDAO";
     private final DbHelper dbHelper;
+    private final ServicoDAO servicoDAO;
 
     public ViagemDAO(Context context) {
         this.dbHelper = DbHelper.getInstance(context);
+        this.servicoDAO = new ServicoDAO(this.dbHelper);
     }
 
     public ViagemDAO(DbHelper dbHelper) {
         this.dbHelper = dbHelper;
+        this.servicoDAO = new ServicoDAO(this.dbHelper);
     }
 
     // CREATE - Inserir um novo registro (viagem)
@@ -42,7 +47,14 @@ public class ViagemDAO {
 
     public long inserir(Viagem viagem) {
         SQLiteDatabase db = dbHelper.getWritableDatabase();
-        return insert(db, viagem);
+        db.beginTransactionNonExclusive();
+        try {
+            long id = insert(db, viagem);
+            db.setTransactionSuccessful();
+            return id;
+        } finally {
+            db.endTransaction();
+        }
     }
 
     public int inserirLote(List<Viagem> viagens, boolean substituirExistentes) {
@@ -90,6 +102,7 @@ public class ViagemDAO {
     private ContentValues toContentValues(Viagem viagem) {
         ContentValues values = new ContentValues();
         String dataIso = Viagem.formatarDataISO8601(viagem.getData());
+        float valorServicoSincronizado = viagem.getValorTotalServicos();
 
         values.put(DbHelper.Viagem.ORIGEM, viagem.getOrigem());
         values.put(DbHelper.Viagem.DATA, dataIso != null ? dataIso : "");
@@ -98,7 +111,7 @@ public class ViagemDAO {
         values.put(DbHelper.Viagem.DESCRICAO, viagem.getDescricao());
         values.put(DbHelper.Viagem.KMS_RODADOS, viagem.getKmsRodados());
         values.put(DbHelper.Viagem.VALOR_KM, viagem.getValorKms());
-        values.put(DbHelper.Viagem.VALOR_SERVICO, viagem.getValorServico());
+        values.put(DbHelper.Viagem.VALOR_SERVICO, valorServicoSincronizado);
         values.put(DbHelper.Viagem.MOTORISTA, viagem.getMotorista());
         values.put(DbHelper.Viagem.HORA_ESPERA, viagem.getHoraEspera());
         values.put(DbHelper.Viagem.VALOR_HORA_ESPERA, viagem.getValorHoraEspera());
@@ -109,7 +122,45 @@ public class ViagemDAO {
     }
 
     private long insert(SQLiteDatabase db, Viagem viagem) {
-        return db.insert(DbHelper.Viagem.NOME_TABELA, null, toContentValues(viagem));
+        long id = db.insert(DbHelper.Viagem.NOME_TABELA, null, toContentValues(viagem));
+        if (id != -1L) {
+            viagem.setId(id);
+            servicoDAO.substituirServicosDaViagem(db, id, resolverServicosParaPersistencia(viagem));
+        }
+        return id;
+    }
+
+    private List<Servico> resolverServicosParaPersistencia(Viagem viagem) {
+        List<Servico> servicos = viagem.getServicos();
+        if (!servicos.isEmpty()) {
+            return servicos;
+        }
+        if (viagem.getValorServico() > 0f) {
+            return Collections.singletonList(new Servico("Serviço adicional", viagem.getValorServico()));
+        }
+        return Collections.emptyList();
+    }
+
+    private void hidratarServicos(SQLiteDatabase db, List<Viagem> viagens) {
+        if (viagens == null || viagens.isEmpty()) {
+            return;
+        }
+        List<Long> ids = new ArrayList<>(viagens.size());
+        for (Viagem v : viagens) {
+            if (v != null && v.getId() > 0L) {
+                ids.add(v.getId());
+            }
+        }
+        if (ids.isEmpty()) {
+            return;
+        }
+        Map<Long, List<Servico>> servicosPorViagem = servicoDAO.getServicosPorViagens(db, ids);
+        for (Viagem v : viagens) {
+            if (v != null) {
+                List<Servico> lista = servicosPorViagem.get(v.getId());
+                v.hidratarServicos(lista != null ? lista : Collections.emptyList());
+            }
+        }
     }
 
     // READ - Consultas paginadas com Keyset / Seek Pagination + Range Scan
@@ -208,6 +259,7 @@ public class ViagemDAO {
         List<Viagem> pagina = temMais
                 ? new ArrayList<>(encontrados.subList(0, effectivePageSize))
                 : encontrados;
+        hidratarServicos(db, pagina);
 
         ViagemCursorKey proximoCursor = null;
         if (temMais && !pagina.isEmpty()) {
@@ -240,6 +292,7 @@ public class ViagemDAO {
                 lista.add(cursorToViagem(cursor));
             }
         }
+        hidratarServicos(db, lista);
         return lista;
     }
 
@@ -287,8 +340,11 @@ public class ViagemDAO {
                     .append("COALESCE(").append(DbHelper.Viagem.MOTORISTA).append(", '') LIKE ? ESCAPE '\\' OR ")
                     .append("COALESCE(").append(DbHelper.Viagem.DESCRICAO).append(", '') LIKE ? ESCAPE '\\' OR ")
                     .append("COALESCE(").append(DbHelper.Viagem.CLASSIFICACAO).append(", '') LIKE ? ESCAPE '\\' OR ")
-                    .append("COALESCE(").append(DbHelper.Viagem.SOLICITANTE).append(", '') LIKE ? ESCAPE '\\')");
-            for (int i = 0; i < 7; i++) {
+                    .append("COALESCE(").append(DbHelper.Viagem.SOLICITANTE).append(", '') LIKE ? ESCAPE '\\' OR ")
+                    .append("EXISTS (SELECT 1 FROM ").append(DbHelper.Servico.NOME_TABELA).append(" s WHERE s.")
+                    .append(DbHelper.Servico.VIAGEM_ID).append(" = ").append(DbHelper.Viagem.NOME_TABELA).append(".").append(DbHelper.Viagem.ID)
+                    .append(" AND COALESCE(s.").append(DbHelper.Servico.DESCRICAO).append(", '') LIKE ? ESCAPE '\\'))");
+            for (int i = 0; i < 8; i++) {
                 args.add(likePattern);
             }
         }
@@ -340,6 +396,7 @@ public class ViagemDAO {
                 lista.add(cursorToViagem(cursor));
             }
         }
+        hidratarServicos(db, lista);
         return lista;
     }
 
@@ -354,6 +411,7 @@ public class ViagemDAO {
                 lista.add(cursorToViagem(cursor));
             }
         }
+        hidratarServicos(db, lista);
         return lista;
     }
 
@@ -361,8 +419,18 @@ public class ViagemDAO {
 
     public int update(Viagem viagem) {
         SQLiteDatabase db = dbHelper.getWritableDatabase();
-        return db.update(DbHelper.Viagem.NOME_TABELA, toContentValues(viagem),
-                DbHelper.Viagem.ID + " = ?", new String[]{String.valueOf(viagem.getId())});
+        db.beginTransactionNonExclusive();
+        try {
+            int linhas = db.update(DbHelper.Viagem.NOME_TABELA, toContentValues(viagem),
+                    DbHelper.Viagem.ID + " = ?", new String[]{String.valueOf(viagem.getId())});
+            if (linhas > 0) {
+                servicoDAO.substituirServicosDaViagem(db, viagem.getId(), resolverServicosParaPersistencia(viagem));
+            }
+            db.setTransactionSuccessful();
+            return linhas;
+        } finally {
+            db.endTransaction();
+        }
     }
 
     // DELETE - remover um registro do banco de dados
@@ -403,7 +471,9 @@ public class ViagemDAO {
                 new String[]{String.valueOf(id)},
                 null, null, null)) {
             if (cursor != null && cursor.moveToFirst()) {
-                return cursorToViagem(cursor);
+                Viagem v = cursorToViagem(cursor);
+                hidratarServicos(db, Collections.singletonList(v));
+                return v;
             }
         }
         return null;
@@ -422,6 +492,7 @@ public class ViagemDAO {
                 lista.add(cursorToViagem(cursor));
             }
         }
+        hidratarServicos(db, lista);
         return lista;
     }
 
@@ -436,6 +507,7 @@ public class ViagemDAO {
                 lista.add(cursorToViagem(cursor));
             }
         }
+        hidratarServicos(db, lista);
         return lista;
     }
 
@@ -454,6 +526,7 @@ public class ViagemDAO {
                 lista.add(cursorToViagem(cursor));
             }
         }
+        hidratarServicos(db, lista);
         return lista;
     }
 
@@ -472,6 +545,7 @@ public class ViagemDAO {
                 lista.add(cursorToViagem(cursor));
             }
         }
+        hidratarServicos(db, lista);
         return lista;
     }
 

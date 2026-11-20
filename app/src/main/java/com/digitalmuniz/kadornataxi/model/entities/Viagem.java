@@ -3,16 +3,13 @@ package com.digitalmuniz.kadornataxi.model.entities;
 import android.content.Context;
 
 import com.digitalmuniz.kadornataxi.data.dao.ConfiguracaoDAO;
-import com.digitalmuniz.kadornataxi.view.dto.MesViagens;
 
 import java.io.Serializable;
 import java.time.LocalDate;
 import java.time.format.DateTimeFormatter;
 import java.time.format.DateTimeParseException;
 import java.util.ArrayList;
-import java.util.LinkedHashMap;
 import java.util.List;
-import java.util.Map;
 
 public class Viagem implements Serializable {
     private long id;
@@ -30,6 +27,7 @@ public class Viagem implements Serializable {
     private String classificacao;
     private float valorTotal;
     private String solicitante = "";
+    private List<Servico> servicos = new ArrayList<>();
 
     // --------------- construtores ---------------
 
@@ -116,38 +114,6 @@ public class Viagem implements Serializable {
             return data;
         }
         return partes[2] + "/" + partes[1];
-    }
-
-    public static List<MesViagens> gerarListaDeMeses(List<Viagem> todas) {
-        List<MesViagens> listaMeses = new ArrayList<>();
-        if (todas == null) {
-            return listaMeses;
-        }
-
-        Map<String, List<Viagem>> viagensPorMes = new LinkedHashMap<>();
-
-        for (Viagem viagem : todas) {
-            if (viagem == null) {
-                continue;
-            }
-            String dataViagem = viagem.getData();
-            String mesAno = (dataViagem != null && dataViagem.length() >= 7)
-                    ? dataViagem.substring(0, 7)
-                    : (dataViagem != null ? dataViagem : "");
-
-            if (viagem.isNaoComum()) {
-                mesAno += "-" + viagem.getClassificacao();
-            }
-
-            viagensPorMes
-                    .computeIfAbsent(mesAno, k -> new ArrayList<>())
-                    .add(viagem);
-        }
-
-        for (String mes : viagensPorMes.keySet()) {
-            listaMeses.add(new MesViagens(mes, viagensPorMes.get(mes)));
-        }
-        return listaMeses;
     }
 
     public boolean isNaoComum() {
@@ -274,6 +240,71 @@ public class Viagem implements Serializable {
 
     public void setSolicitante(String solicitante) {
         this.solicitante = solicitante != null ? solicitante : "";
+    }
+
+    public List<Servico> getServicos() {
+        return servicos != null ? new ArrayList<>(servicos) : new ArrayList<>();
+    }
+
+    public void setServicos(List<Servico> servicos) {
+        this.servicos = copiarServicos(servicos);
+        float soma = calcularSomaServicos(this.servicos);
+        if (Float.compare(this.valorServico, soma) != 0 || Float.compare(this.valorTotal, 0f) == 0) {
+            this.valorServico = soma;
+            this.valorTotal = this.valorKms + this.valorHoraEspera + this.valorServico;
+        }
+    }
+
+    public void hidratarServicos(List<Servico> servicos) {
+        this.servicos = copiarServicos(servicos);
+        if (!this.servicos.isEmpty()) {
+            this.valorServico = calcularSomaServicos(this.servicos);
+        }
+    }
+
+    public float getValorTotalServicos() {
+        if (servicos != null && !servicos.isEmpty()) {
+            return calcularSomaServicos(servicos);
+        }
+        return valorServico;
+    }
+
+    /**
+     * Retorna a quantidade de servicos da viagem, considerando compatibilidade legada
+     * quando nao ha itens detalhados mas ha valorServico positivo.
+     */
+    public int getQuantidadeServicos() {
+        if (servicos != null && !servicos.isEmpty()) {
+            return servicos.size();
+        }
+        if (valorServico > 0f) {
+            return 1;
+        }
+        return 0;
+    }
+
+    private static List<Servico> copiarServicos(List<Servico> origem) {
+        List<Servico> copia = new ArrayList<>();
+        if (origem != null) {
+            for (Servico servico : origem) {
+                if (servico != null) {
+                    copia.add(servico);
+                }
+            }
+        }
+        return copia;
+    }
+
+    private static float calcularSomaServicos(List<Servico> lista) {
+        float soma = 0f;
+        if (lista != null) {
+            for (Servico servico : lista) {
+                if (servico != null) {
+                    soma += servico.getValor();
+                }
+            }
+        }
+        return soma;
     }
 }
 
