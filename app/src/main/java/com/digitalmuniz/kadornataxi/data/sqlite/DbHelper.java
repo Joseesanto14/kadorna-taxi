@@ -5,17 +5,41 @@ import android.database.sqlite.SQLiteDatabase;
 import android.database.sqlite.SQLiteOpenHelper;
 
 public class DbHelper extends SQLiteOpenHelper {
-    private static final String DATABASE_NAME = "kadorna_taxi.db";
-    private static final int DATABASE_VERSION = 4;
+    public static final String DATABASE_NAME = "kadorna_taxi.db";
+    public static final int DATABASE_VERSION = 5;
+
+    private static volatile DbHelper instance;
+
+    public static DbHelper getInstance(Context context) {
+        if (instance == null) {
+            synchronized (DbHelper.class) {
+                if (instance == null) {
+                    instance = new DbHelper(context.getApplicationContext());
+                }
+            }
+        }
+        return instance;
+    }
 
     public DbHelper(Context context) {
-        super(context, DbHelper.DATABASE_NAME, null, DATABASE_VERSION);
+        super(context, DATABASE_NAME, null, DATABASE_VERSION);
+    }
+
+    public DbHelper(Context context, String databaseName) {
+        super(context, databaseName, null, DATABASE_VERSION);
+    }
+
+    @Override
+    public void onConfigure(SQLiteDatabase db) {
+        super.onConfigure(db);
+        db.enableWriteAheadLogging();
     }
 
     @Override
     public void onCreate(SQLiteDatabase db) {
         db.execSQL(Viagem.CRIAR_TABELA);
         db.execSQL(Configuracao.CRIAR_TABELA);
+        criarIndices(db);
     }
 
     @Override
@@ -31,6 +55,16 @@ public class DbHelper extends SQLiteOpenHelper {
             db.execSQL("ALTER TABLE " + Configuracao.NOME_TABELA + " ADD COLUMN " + Configuracao.TELEFONE + " TEXT");
             db.execSQL("ALTER TABLE " + Configuracao.NOME_TABELA + " ADD COLUMN " + Configuracao.EMAIL + " TEXT");
         }
+        if (oldVersion < 5) {
+            criarIndices(db);
+        }
+    }
+
+    private void criarIndices(SQLiteDatabase db) {
+        db.execSQL("CREATE INDEX IF NOT EXISTS idx_viagem_data_hora_id ON " + Viagem.NOME_TABELA +
+                " (" + Viagem.DATA + " DESC, " + Viagem.HORA + " DESC, " + Viagem.ID + " DESC)");
+        db.execSQL("CREATE INDEX IF NOT EXISTS idx_viagem_classif_data_hora_id ON " + Viagem.NOME_TABELA +
+                " (" + Viagem.CLASSIFICACAO + ", " + Viagem.DATA + " DESC, " + Viagem.HORA + " DESC, " + Viagem.ID + " DESC)");
     }
 
     // ---------- Tabela Viagem ----------

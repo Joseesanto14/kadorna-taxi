@@ -3,4 +3,31 @@
     <color name="black">#FF000000</color>
     <color name="white">#FFFFFFFF</color>
     <color name="MOSTARDA">#CDC718</color>
+
+    <!-- Design System Tokens -->
+    <color name="brand_green_dark">#1B5E20</color>
+    <color name="brand_green">#2E7D32</color>
+    <color name="brand_green_light">#E8F5E9</color>
+    <color name="brand_green_bar_inactive">#A5D6A7</color>
+
+    <color name="surface_card">#FFFFFF</color>
+    <color name="surface_subtle">#F5F7F5</color>
+    <color name="progress_track_neutral">#E8ECE8</color>
+    <color name="border_subtle">#E0E0E0</color>
+
+    <color name="text_primary">#1A1C1A</color>
+    <color name="text_secondary">#616161</color>
+    <color name="text_muted">#616161</color>
+
+    <color name="delta_positive">#1B5E20</color>
+    <color name="delta_positive_bg">#E8F5E9</color>
+    <color name="delta_negative">#C62828</color>
+    <color name="delta_negative_bg">#FFEBEE</color>
+    <color name="delta_neutral">#455A64</color>
+    <color name="delta_neutral_bg">#ECEFF1</color>
+
+    <color name="chart_average_line">#78909C</color>
+    <color name="composition_km">#1B5E20</color>
+    <color name="composition_espera">#F9A825</color>
+    <color name="composition_servico">#0277BD</color>
 </resources>

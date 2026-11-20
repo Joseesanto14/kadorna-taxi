@@ -17,4 +17,6 @@
 .cxx
 local.properties
 *.class
+*.apk
+*.aab
 .artifacts

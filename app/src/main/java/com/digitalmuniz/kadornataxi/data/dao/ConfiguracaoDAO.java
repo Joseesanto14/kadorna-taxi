@@ -11,21 +11,17 @@ import com.digitalmuniz.kadornataxi.data.sqlite.DbHelper;
 import com.digitalmuniz.kadornataxi.model.entities.Configuracao;
 
 public class ConfiguracaoDAO {
-    private SQLiteDatabase db;
+    private static final String TAG = "ConfiguracaoDAO";
     private final DbHelper dbHelper;
-    private final String TAG = "ConfiguracaoDAO";
 
     public ConfiguracaoDAO(Context context) {
-        dbHelper = new DbHelper(context);
+        this.dbHelper = DbHelper.getInstance(context);
     }
 
-    private void open() {
-        db = dbHelper.getWritableDatabase();
+    public ConfiguracaoDAO(DbHelper dbHelper) {
+        this.dbHelper = dbHelper;
     }
 
-    private void close() {
-        dbHelper.close();
-    }
     private ContentValues valuesPut(Configuracao configuracao) {
         ContentValues values = new ContentValues();
 
@@ -51,16 +47,14 @@ public class ConfiguracaoDAO {
         return values;
     }
 
-    private long insert(Configuracao configuracao) {
+    private long insert(SQLiteDatabase db, Configuracao configuracao) {
         ContentValues values = valuesPut(configuracao);
-
         values.put(DbHelper.Configuracao.ID, 1);
 
-        return db.insert(DbHelper.Configuracao.NOME_TABELA,
-                null, values);
+        return db.insert(DbHelper.Configuracao.NOME_TABELA, null, values);
     }
 
-    private long update(Configuracao configuracao) {
+    private long update(SQLiteDatabase db, Configuracao configuracao) {
         ContentValues values = valuesPut(configuracao);
 
         return db.update(DbHelper.Configuracao.NOME_TABELA,
@@ -68,15 +62,13 @@ public class ConfiguracaoDAO {
                 DbHelper.Configuracao.ID + " = ?",
                 new String[]{String.valueOf(configuracao.getId())});
     }
+
     public void setConfiguracaoPadrao() {
-        open();
-
-        Log.d(TAG, "Configuração padrão gerada com o ID: " + insert(
-                new Configuracao(1, 1.99f, 20f,
-                        "Marcelo", "Trecho 2", 
-                        "", "", "", "", "")));
-
-        close();
+        SQLiteDatabase db = dbHelper.getWritableDatabase();
+        long id = insert(db, new Configuracao(1, 1.99f, 20f,
+                "Marcelo", "Trecho 2",
+                "", "", "", "", ""));
+        Log.d(TAG, "Configuração padrão gerada com o ID: " + id);
     }
 
     public void configurar(Configuracao configuracao, Context context) {
@@ -98,47 +90,31 @@ public class ConfiguracaoDAO {
     }
 
     private void setConfiguracao(Configuracao configuracao) {
-        open();
-
-        Log.d(TAG,
-                "Configuração salva com o ID: " + insert(configuracao));
-
-        close();
+        SQLiteDatabase db = dbHelper.getWritableDatabase();
+        Log.d(TAG, "Configuração salva com o ID: " + insert(db, configuracao));
     }
 
     private void updateConfiguracao(Configuracao configuracao) {
-        open();
-
-        Log.d (TAG ,
-                "Configuração atualizada, linhas alteradas: " + update(configuracao));
-
-        close();
+        SQLiteDatabase db = dbHelper.getWritableDatabase();
+        Log.d(TAG, "Configuração atualizada, linhas alteradas: " + update(db, configuracao));
     }
 
     public Configuracao getConfiguracao() {
-        open();
-
-        Cursor cursor = db.query(
+        SQLiteDatabase db = dbHelper.getReadableDatabase();
+        try (Cursor cursor = db.query(
                 DbHelper.Configuracao.NOME_TABELA,
                 null,
                 DbHelper.Configuracao.ID + " = ?",
-                new String[]{"1"} ,
-                null, null, null);
-
-        Configuracao configuracao = null;
-
-        if (cursor.moveToFirst()) {
-            configuracao = cursorToConfiguracao(cursor);
+                new String[]{"1"},
+                null, null, null)) {
+            if (cursor != null && cursor.moveToFirst()) {
+                return cursorToConfiguracao(cursor);
+            }
         }
-
-        cursor.close();
-        close();
-
-        return configuracao;
+        return null;
     }
 
     private Configuracao cursorToConfiguracao(Cursor cursor) {
-
         return new Configuracao(
                 cursor.getLong(cursor.getColumnIndexOrThrow(
                         DbHelper.Configuracao.ID)),
@@ -164,18 +140,12 @@ public class ConfiguracaoDAO {
     }
 
     public boolean configExiste() {
-        open();
-
-        Cursor cursor = db.query(
+        SQLiteDatabase db = dbHelper.getReadableDatabase();
+        try (Cursor cursor = db.query(
                 DbHelper.Configuracao.NOME_TABELA,
-                null, null, null,
-                null, null, null);
-
-        boolean existe = cursor.getCount() > 0;
-
-        cursor.close();
-        close();
-
-        return existe;
+                new String[]{DbHelper.Configuracao.ID},
+                null, null, null, null, null)) {
+            return cursor != null && cursor.getCount() > 0;
+        }
     }
 }
