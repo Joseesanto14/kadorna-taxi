@@ -31,6 +31,7 @@ public class ViagensActivity extends AppCompatActivity {
 
     private TextView txtTitulo;
     private FloatingActionButton fabNovaViagem;
+    private FloatingActionButton fabNovoCusto;
     private BottomNavigationView bottomNavigation;
 
     private ViagensFragment viagensFragment;
@@ -54,7 +55,14 @@ public class ViagensActivity extends AppCompatActivity {
         configuracaoDAO = new ConfiguracaoDAO(this);
         txtTitulo = findViewById(R.id.txtTitulo);
         fabNovaViagem = findViewById(R.id.fabNovaViagem);
+        fabNovoCusto = findViewById(R.id.fabNovoCusto);
         bottomNavigation = findViewById(R.id.bottomNavigation);
+
+        fabNovoCusto.setOnClickListener(v -> {
+            if (dashboardFragment != null) {
+                dashboardFragment.abrirDialogNovoCusto();
+            }
+        });
 
         configurarFragments(savedInstanceState);
         configurarBottomNavigation();
@@ -124,10 +132,12 @@ public class ViagensActivity extends AppCompatActivity {
             tx.hide(viagensFragment).show(dashboardFragment);
             txtTitulo.setText(R.string.titulo_dashboard_financeiro);
             fabNovaViagem.setVisibility(View.GONE);
+            fabNovoCusto.setVisibility(View.VISIBLE);
         } else {
             tx.hide(dashboardFragment).show(viagensFragment);
             txtTitulo.setText(R.string.titulo_minhas_viagens);
             fabNovaViagem.setVisibility(View.VISIBLE);
+            fabNovoCusto.setVisibility(View.GONE);
         }
         tx.commit();
     }
