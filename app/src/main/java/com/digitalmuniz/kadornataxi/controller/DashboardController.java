@@ -4,7 +4,9 @@ import android.content.Context;
 import android.os.Handler;
 import android.os.Looper;
 
+import com.digitalmuniz.kadornataxi.data.dao.CustoDAO;
 import com.digitalmuniz.kadornataxi.data.dao.DashboardDAO;
+import com.digitalmuniz.kadornataxi.model.entities.Custo;
 import com.digitalmuniz.kadornataxi.util.PeriodoInicialResolver;
 import com.digitalmuniz.kadornataxi.view.dto.ClassificacaoResumoDTO;
 import com.digitalmuniz.kadornataxi.view.dto.DashboardDadosDTO;
@@ -30,7 +32,14 @@ public class DashboardController {
         void onErro(String mensagem);
     }
 
+    public interface OperacaoCallback {
+        void onSucesso();
+
+        void onErro(String mensagem);
+    }
+
     private final DashboardDAO dashboardDAO;
+    private final CustoDAO custoDAO;
     private final ExecutorService executor;
     private final Handler mainHandler;
     private final Supplier<LocalDate> dataReferenciaSupplier;
@@ -42,6 +51,7 @@ public class DashboardController {
     public DashboardController(Context context) {
         this(
                 new DashboardDAO(context),
+                new CustoDAO(context),
                 Executors.newSingleThreadExecutor(),
                 new Handler(Looper.getMainLooper()),
                 LocalDate::now
@@ -53,7 +63,7 @@ public class DashboardController {
             ExecutorService executor,
             Handler mainHandler
     ) {
-        this(dashboardDAO, executor, mainHandler, LocalDate::now);
+        this(dashboardDAO, null, executor, mainHandler, LocalDate::now);
     }
 
     public DashboardController(
@@ -62,7 +72,18 @@ public class DashboardController {
             Handler mainHandler,
             Supplier<LocalDate> dataReferenciaSupplier
     ) {
+        this(dashboardDAO, null, executor, mainHandler, dataReferenciaSupplier);
+    }
+
+    public DashboardController(
+            DashboardDAO dashboardDAO,
+            CustoDAO custoDAO,
+            ExecutorService executor,
+            Handler mainHandler,
+            Supplier<LocalDate> dataReferenciaSupplier
+    ) {
         this.dashboardDAO = dashboardDAO;
+        this.custoDAO = custoDAO;
         this.executor = executor;
         this.mainHandler = mainHandler;
         this.dataReferenciaSupplier = dataReferenciaSupplier != null ? dataReferenciaSupplier : LocalDate::now;
@@ -186,6 +207,75 @@ public class DashboardController {
         }
     }
 
+    public void salvarCusto(Custo custo, OperacaoCallback callback) {
+        if (executor.isShutdown()) {
+            return;
+        }
+        if (custoDAO == null || custo == null) {
+            if (callback != null) {
+                mainHandler.post(() -> callback.onErro("Dados inválidos para salvar custo."));
+            }
+            return;
+        }
+        executor.execute(() -> {
+            try {
+                boolean sucesso;
+                if (custo.getId() > 0L) {
+                    sucesso = custoDAO.atualizar(custo) > 0;
+                } else {
+                    sucesso = custoDAO.inserir(custo) > 0L;
+                }
+                mainHandler.post(() -> {
+                    if (callback != null) {
+                        if (sucesso) {
+                            callback.onSucesso();
+                        } else {
+                            callback.onErro("Não foi possível salvar o custo.");
+                        }
+                    }
+                });
+            } catch (Exception e) {
+                mainHandler.post(() -> {
+                    if (callback != null) {
+                        callback.onErro(e.getMessage());
+                    }
+                });
+            }
+        });
+    }
+
+    public void excluirCusto(long idCusto, OperacaoCallback callback) {
+        if (executor.isShutdown()) {
+            return;
+        }
+        if (custoDAO == null || idCusto <= 0L) {
+            if (callback != null) {
+                mainHandler.post(() -> callback.onErro("Custo inválido para exclusão."));
+            }
+            return;
+        }
+        executor.execute(() -> {
+            try {
+                boolean sucesso = custoDAO.deletar(idCusto) > 0;
+                mainHandler.post(() -> {
+                    if (callback != null) {
+                        if (sucesso) {
+                            callback.onSucesso();
+                        } else {
+                            callback.onErro("Custo não encontrado.");
+                        }
+                    }
+                });
+            } catch (Exception e) {
+                mainHandler.post(() -> {
+                    if (callback != null) {
+                        callback.onErro(e.getMessage());
+                    }
+                });
+            }
+        });
+    }
+
     public void shutdown() {
         generation.incrementAndGet();
         executor.shutdownNow();
@@ -200,6 +290,7 @@ public class DashboardController {
         DashboardResumoDTO resumo = dashboardDAO.buscarResumoPorPeriodo(anoSelecionado, mesSelecionado);
         List<FaturamentoMensalDTO> evolucao = dashboardDAO.buscarEvolucaoMensalDoAno(anoSelecionado);
         List<ClassificacaoResumoDTO> ranking = dashboardDAO.buscarRankingClassificacao(anoSelecionado, mesSelecionado);
+        List<Custo> custos = dashboardDAO.buscarCustosPorPeriodo(anoSelecionado, mesSelecionado);
         return new DashboardDadosDTO(
                 anos,
                 mesesDisponiveis,
@@ -207,7 +298,8 @@ public class DashboardController {
                 mesSelecionado,
                 resumo,
                 evolucao,
-                ranking
+                ranking,
+                custos
         );
     }
 

@@ -5,6 +5,7 @@ import android.database.Cursor;
 import android.database.sqlite.SQLiteDatabase;
 
 import com.digitalmuniz.kadornataxi.data.sqlite.DbHelper;
+import com.digitalmuniz.kadornataxi.model.entities.Custo;
 import com.digitalmuniz.kadornataxi.util.FormatadorDashboard;
 import com.digitalmuniz.kadornataxi.view.dto.ClassificacaoResumoDTO;
 import com.digitalmuniz.kadornataxi.view.dto.DashboardResumoDTO;
@@ -34,10 +35,15 @@ public class DashboardDAO {
     public List<String> buscarAnosDisponiveis() {
         SQLiteDatabase db = dbHelper.getReadableDatabase();
         List<String> anos = new ArrayList<>();
-        String sql = "SELECT DISTINCT substr(" + DbHelper.Viagem.DATA + ", 1, 4) AS ano " +
+        String sql = "SELECT DISTINCT ano FROM (" +
+                "SELECT substr(" + DbHelper.Viagem.DATA + ", 1, 4) AS ano " +
                 "FROM " + DbHelper.Viagem.NOME_TABELA + " " +
                 "WHERE " + DbHelper.Viagem.DATA + " >= '0000' AND " + DbHelper.Viagem.DATA + " < '9999' " +
-                "ORDER BY ano DESC";
+                "UNION " +
+                "SELECT substr(" + DbHelper.Custo.DATA + ", 1, 4) AS ano " +
+                "FROM " + DbHelper.Custo.NOME_TABELA + " " +
+                "WHERE " + DbHelper.Custo.DATA + " >= '0000' AND " + DbHelper.Custo.DATA + " < '9999'" +
+                ") ORDER BY ano DESC";
 
         try (Cursor cursor = db.rawQuery(sql, null)) {
             while (cursor != null && cursor.moveToNext()) {
@@ -58,12 +64,20 @@ public class DashboardDAO {
 
         SQLiteDatabase db = dbHelper.getReadableDatabase();
         List<String> meses = new ArrayList<>();
-        String sql = "SELECT DISTINCT substr(" + DbHelper.Viagem.DATA + ", 6, 2) AS mes " +
+        String sql = "SELECT DISTINCT mes FROM (" +
+                "SELECT substr(" + DbHelper.Viagem.DATA + ", 6, 2) AS mes " +
                 "FROM " + DbHelper.Viagem.NOME_TABELA + " " +
                 "WHERE " + DbHelper.Viagem.DATA + " >= ? AND " + DbHelper.Viagem.DATA + " < ? " +
-                "ORDER BY mes ASC";
+                "UNION " +
+                "SELECT substr(" + DbHelper.Custo.DATA + ", 6, 2) AS mes " +
+                "FROM " + DbHelper.Custo.NOME_TABELA + " " +
+                "WHERE " + DbHelper.Custo.DATA + " >= ? AND " + DbHelper.Custo.DATA + " < ?" +
+                ") ORDER BY mes ASC";
 
-        try (Cursor cursor = db.rawQuery(sql, new String[]{intervalo.inicio, intervalo.fimExclusivo})) {
+        try (Cursor cursor = db.rawQuery(sql, new String[]{
+                intervalo.inicio, intervalo.fimExclusivo,
+                intervalo.inicio, intervalo.fimExclusivo
+        })) {
             while (cursor != null && cursor.moveToNext()) {
                 String mes = cursor.getString(0);
                 if (isMesValido(mes)) {
@@ -77,7 +91,11 @@ public class DashboardDAO {
     public DashboardResumoDTO buscarResumoPorPeriodo(String ano, String mesOuNull) {
         PeriodoIntervalo intervalo = criarIntervaloPeriodo(ano, mesOuNull);
         if (intervalo == null) {
-            return new DashboardResumoDTO(0, 0, 0.0, 0.0, null, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0, 0, 0.0);
+            return new DashboardResumoDTO(
+                    0, 0, 0.0, 0.0, null, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0,
+                    0, 0, 0.0,
+                    0.0, 0, 0.0, 0.0, 0.0, null, null, null
+            );
         }
 
         SQLiteDatabase db = dbHelper.getReadableDatabase();
@@ -118,8 +136,28 @@ public class DashboardDAO {
         double faturamentoAnterior = buscarFaturamentoSimples(
                 db, intervalo.anteriorInicio, intervalo.anteriorFimExclusivo);
 
+        CustoResumoRaw custosResumo = buscarResumoCustosPorPeriodo(
+                db, intervalo.inicio, intervalo.fimExclusivo);
+        double custosAnterior = buscarResumoCustosPorPeriodo(
+                db, intervalo.anteriorInicio, intervalo.anteriorFimExclusivo).totalCustos;
+
         Double variacaoPercentual = faturamentoAnterior > 0.0
                 ? ((faturamentoTotal - faturamentoAnterior) / faturamentoAnterior) * 100.0
+                : null;
+
+        double lucroLiquido = faturamentoTotal - custosResumo.totalCustos;
+        double lucroPeriodoAnterior = faturamentoAnterior - custosAnterior;
+
+        Double margemLiquidaPercentual = faturamentoTotal > 0.0
+                ? (lucroLiquido / faturamentoTotal) * 100.0
+                : null;
+
+        Double variacaoCustosPercentual = custosAnterior > 0.0
+                ? ((custosResumo.totalCustos - custosAnterior) / custosAnterior) * 100.0
+                : null;
+
+        Double variacaoLucroPercentual = lucroPeriodoAnterior > 0.0
+                ? ((lucroLiquido - lucroPeriodoAnterior) / lucroPeriodoAnterior) * 100.0
                 : null;
 
         double ticketMedio = totalViagens > 0 ? faturamentoTotal / totalViagens : 0.0;
@@ -145,17 +183,26 @@ public class DashboardDAO {
                 servicosResumo.totalValorServico,
                 servicosResumo.totalServicos,
                 servicosResumo.viagensComServico,
-                mediaPorServico
+                mediaPorServico,
+                custosResumo.totalCustos,
+                custosResumo.totalRegistros,
+                custosAnterior,
+                lucroLiquido,
+                lucroPeriodoAnterior,
+                margemLiquidaPercentual,
+                variacaoLucroPercentual,
+                variacaoCustosPercentual
         );
     }
 
     public List<FaturamentoMensalDTO> buscarEvolucaoMensalDoAno(String ano) {
         PeriodoIntervalo intervalo = criarIntervaloPeriodo(ano, null);
-        Map<String, FaturamentoMensalDTO> mapaPorMes = new HashMap<>();
+        Map<String, ViagemMensalRaw> viagensPorMes = new HashMap<>();
+        Map<String, Double> custosPorMes = new HashMap<>();
 
         if (intervalo != null) {
             SQLiteDatabase db = dbHelper.getReadableDatabase();
-            String sql = "SELECT " +
+            String sqlViagens = "SELECT " +
                     "substr(" + DbHelper.Viagem.DATA + ", 6, 2) AS mes, " +
                     "COUNT(*) AS total_viagens, " +
                     "COALESCE(SUM(" + DbHelper.Viagem.VALOR_TOTAL + "), 0.0) AS faturamento_total, " +
@@ -165,17 +212,32 @@ public class DashboardDAO {
                     "GROUP BY mes " +
                     "ORDER BY mes ASC";
 
-            try (Cursor cursor = db.rawQuery(sql, new String[]{intervalo.inicio, intervalo.fimExclusivo})) {
+            try (Cursor cursor = db.rawQuery(sqlViagens, new String[]{intervalo.inicio, intervalo.fimExclusivo})) {
                 while (cursor != null && cursor.moveToNext()) {
                     String mes = cursor.getString(0);
                     if (isMesValido(mes)) {
-                        mapaPorMes.put(mes, new FaturamentoMensalDTO(
-                                mes,
-                                FormatadorDashboard.getSiglaMes(mes),
+                        viagensPorMes.put(mes, new ViagemMensalRaw(
                                 cursor.getInt(1),
                                 cursor.getDouble(2),
                                 cursor.getDouble(3)
                         ));
+                    }
+                }
+            }
+
+            String sqlCustos = "SELECT " +
+                    "substr(" + DbHelper.Custo.DATA + ", 6, 2) AS mes, " +
+                    "COALESCE(SUM(" + DbHelper.Custo.VALOR + "), 0.0) AS total_custos " +
+                    "FROM " + DbHelper.Custo.NOME_TABELA + " " +
+                    "WHERE " + DbHelper.Custo.DATA + " >= ? AND " + DbHelper.Custo.DATA + " < ? " +
+                    "GROUP BY mes " +
+                    "ORDER BY mes ASC";
+
+            try (Cursor cursor = db.rawQuery(sqlCustos, new String[]{intervalo.inicio, intervalo.fimExclusivo})) {
+                while (cursor != null && cursor.moveToNext()) {
+                    String mes = cursor.getString(0);
+                    if (isMesValido(mes)) {
+                        custosPorMes.put(mes, cursor.getDouble(1));
                     }
                 }
             }
@@ -184,20 +246,48 @@ public class DashboardDAO {
         List<FaturamentoMensalDTO> evolucao = new ArrayList<>(12);
         for (int m = 1; m <= 12; m++) {
             String mesNumero = String.format(Locale.US, "%02d", m);
-            FaturamentoMensalDTO existente = mapaPorMes.get(mesNumero);
-            if (existente != null) {
-                evolucao.add(existente);
-            } else {
-                evolucao.add(new FaturamentoMensalDTO(
-                        mesNumero,
-                        FormatadorDashboard.getSiglaMes(mesNumero),
-                        0,
-                        0.0,
-                        0.0
-                ));
-            }
+            ViagemMensalRaw vRaw = viagensPorMes.get(mesNumero);
+            int totalViagens = vRaw != null ? vRaw.totalViagens : 0;
+            double faturamento = vRaw != null ? vRaw.faturamentoTotal : 0.0;
+            double totalKms = vRaw != null ? vRaw.totalKms : 0.0;
+            Double custoObj = custosPorMes.get(mesNumero);
+            double totalCustos = custoObj != null ? custoObj : 0.0;
+            double lucroLiquido = faturamento - totalCustos;
+
+            evolucao.add(new FaturamentoMensalDTO(
+                    mesNumero,
+                    FormatadorDashboard.getSiglaMes(mesNumero),
+                    totalViagens,
+                    faturamento,
+                    totalKms,
+                    totalCustos,
+                    lucroLiquido
+            ));
         }
         return evolucao;
+    }
+
+    public List<Custo> buscarCustosPorPeriodo(String ano, String mesOuNull) {
+        PeriodoIntervalo intervalo = criarIntervaloPeriodo(ano, mesOuNull);
+        if (intervalo == null) {
+            return Collections.emptyList();
+        }
+        SQLiteDatabase db = dbHelper.getReadableDatabase();
+        List<Custo> lista = new ArrayList<>();
+        try (Cursor cursor = db.query(
+                DbHelper.Custo.NOME_TABELA,
+                null,
+                DbHelper.Custo.DATA + " >= ? AND " + DbHelper.Custo.DATA + " < ?",
+                new String[]{intervalo.inicio, intervalo.fimExclusivo},
+                null,
+                null,
+                DbHelper.Custo.DATA + " DESC, " + DbHelper.Custo.ID + " DESC"
+        )) {
+            while (cursor != null && cursor.moveToNext()) {
+                lista.add(CustoDAO.cursorToCusto(cursor));
+            }
+        }
+        return lista;
     }
 
     public List<ClassificacaoResumoDTO> buscarRankingClassificacao(String ano, String mesOuNull) {
@@ -255,6 +345,18 @@ public class DashboardDAO {
             }
         }
         return 0.0;
+    }
+
+    private CustoResumoRaw buscarResumoCustosPorPeriodo(SQLiteDatabase db, String inicio, String fimExclusivo) {
+        String sql = "SELECT COUNT(*), COALESCE(SUM(" + DbHelper.Custo.VALOR + "), 0.0) " +
+                "FROM " + DbHelper.Custo.NOME_TABELA + " " +
+                "WHERE " + DbHelper.Custo.DATA + " >= ? AND " + DbHelper.Custo.DATA + " < ?";
+        try (Cursor cursor = db.rawQuery(sql, new String[]{inicio, fimExclusivo})) {
+            if (cursor != null && cursor.moveToFirst()) {
+                return new CustoResumoRaw(cursor.getInt(0), cursor.getDouble(1));
+            }
+        }
+        return new CustoResumoRaw(0, 0.0);
     }
 
     private ServicoResumoRaw buscarResumoServicosPorPeriodo(SQLiteDatabase db, String inicio, String fimExclusivo) {
@@ -356,6 +458,28 @@ public class DashboardDAO {
             this.totalServicos = totalServicos;
             this.viagensComServico = viagensComServico;
             this.totalValorServico = totalValorServico;
+        }
+    }
+
+    private static class CustoResumoRaw {
+        final int totalRegistros;
+        final double totalCustos;
+
+        CustoResumoRaw(int totalRegistros, double totalCustos) {
+            this.totalRegistros = totalRegistros;
+            this.totalCustos = totalCustos;
+        }
+    }
+
+    private static class ViagemMensalRaw {
+        final int totalViagens;
+        final double faturamentoTotal;
+        final double totalKms;
+
+        ViagemMensalRaw(int totalViagens, double faturamentoTotal, double totalKms) {
+            this.totalViagens = totalViagens;
+            this.faturamentoTotal = faturamentoTotal;
+            this.totalKms = totalKms;
         }
     }
 

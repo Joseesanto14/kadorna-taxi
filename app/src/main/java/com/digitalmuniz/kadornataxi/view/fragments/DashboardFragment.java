@@ -1,5 +1,7 @@
 package com.digitalmuniz.kadornataxi.view.fragments;
 
+import android.app.AlertDialog;
+import android.app.Dialog;
 import android.content.Intent;
 import android.content.res.ColorStateList;
 import android.graphics.drawable.GradientDrawable;
@@ -25,17 +27,23 @@ import androidx.recyclerview.widget.RecyclerView;
 import com.digitalmuniz.kadornataxi.R;
 import com.digitalmuniz.kadornataxi.controller.DashboardController;
 import com.digitalmuniz.kadornataxi.data.dao.ConfiguracaoDAO;
+import com.digitalmuniz.kadornataxi.model.entities.Custo;
 import com.digitalmuniz.kadornataxi.util.FormatadorDashboard;
 import com.digitalmuniz.kadornataxi.view.activities.ConfiguracaoActivity;
 import com.digitalmuniz.kadornataxi.view.activities.SolicitacaoActivity;
 import com.digitalmuniz.kadornataxi.view.adapters.ClassificacaoResumoAdapter;
+import com.digitalmuniz.kadornataxi.view.adapters.CustoAdapter;
 import com.digitalmuniz.kadornataxi.view.custom.EvolucaoFaturamentoChartView;
+import com.digitalmuniz.kadornataxi.view.dialogs.CustoFormDialog;
 import com.digitalmuniz.kadornataxi.view.dto.DashboardDadosDTO;
 import com.digitalmuniz.kadornataxi.view.dto.DashboardResumoDTO;
+import com.google.android.material.button.MaterialButton;
 import com.google.android.material.chip.Chip;
 import com.google.android.material.chip.ChipGroup;
 import com.google.android.material.progressindicator.LinearProgressIndicator;
 
+import java.time.LocalDate;
+import java.time.YearMonth;
 import java.util.List;
 import java.util.Objects;
 
@@ -45,6 +53,7 @@ public class DashboardFragment extends Fragment {
     private DashboardDadosDTO dadosAtuais;
     private boolean atualizandoChips;
     private boolean recarregarAoVoltar;
+    private Dialog dialogCustoAtivo;
 
     private View dashboardContent;
     private View dashboardLoading;
@@ -61,6 +70,9 @@ public class DashboardFragment extends Fragment {
     private TextView txtFaturamentoTotal;
     private TextView txtComparacaoContexto;
     private TextView txtHeroResumoSecundario;
+    private TextView txtHeroCustosTotais;
+    private TextView txtHeroMargemLiquida;
+    private TextView txtLucroLiquido;
 
     private TextView txtKpiKms;
     private TextView txtKpiReaisPorKm;
@@ -81,11 +93,25 @@ public class DashboardFragment extends Fragment {
     private LinearProgressIndicator progressComposicaoServico;
 
     private TextView txtEvolucaoMedia;
+    private ChipGroup chipGroupModoGrafico;
+    private Chip chipGraficoReceitaCustos;
+    private Chip chipGraficoLucro;
+    private View layoutLegendaGrafico;
     private EvolucaoFaturamentoChartView evolucaoChart;
+
+    private MaterialButton btnAdicionarCustoCard;
+    private TextView txtCardCustosTotal;
+    private TextView txtCardCustosQtd;
+    private LinearProgressIndicator progressCustosSobreReceita;
+    private TextView txtCustosPercentualReceita;
+    private View layoutCustosVazio;
+    private RecyclerView recyclerCustos;
+    private CustoAdapter custoAdapter;
 
     private RecyclerView recyclerClassificacao;
     private ClassificacaoResumoAdapter classificacaoAdapter;
 
+    private Button btnRegistrarCustoEmpty;
     private TextView txtDashboardErro;
 
     private final DashboardController.Callback dashboardCallback = new DashboardController.Callback() {
@@ -192,8 +218,15 @@ public class DashboardFragment extends Fragment {
     @Override
     public void onDestroyView() {
         super.onDestroyView();
+        if (dialogCustoAtivo != null && dialogCustoAtivo.isShowing()) {
+            dialogCustoAtivo.dismiss();
+        }
+        dialogCustoAtivo = null;
         if (recyclerClassificacao != null) {
             recyclerClassificacao.setAdapter(null);
+        }
+        if (recyclerCustos != null) {
+            recyclerCustos.setAdapter(null);
         }
         dashboardContent = null;
         dashboardLoading = null;
@@ -208,6 +241,9 @@ public class DashboardFragment extends Fragment {
         txtFaturamentoTotal = null;
         txtComparacaoContexto = null;
         txtHeroResumoSecundario = null;
+        txtHeroCustosTotais = null;
+        txtHeroMargemLiquida = null;
+        txtLucroLiquido = null;
         txtKpiKms = null;
         txtKpiReaisPorKm = null;
         txtKpiHorasEspera = null;
@@ -225,9 +261,22 @@ public class DashboardFragment extends Fragment {
         txtComposicaoServico = null;
         progressComposicaoServico = null;
         txtEvolucaoMedia = null;
+        chipGroupModoGrafico = null;
+        chipGraficoReceitaCustos = null;
+        chipGraficoLucro = null;
+        layoutLegendaGrafico = null;
         evolucaoChart = null;
+        btnAdicionarCustoCard = null;
+        txtCardCustosTotal = null;
+        txtCardCustosQtd = null;
+        progressCustosSobreReceita = null;
+        txtCustosPercentualReceita = null;
+        layoutCustosVazio = null;
+        recyclerCustos = null;
+        custoAdapter = null;
         recyclerClassificacao = null;
         classificacaoAdapter = null;
+        btnRegistrarCustoEmpty = null;
         txtDashboardErro = null;
     }
 
@@ -236,6 +285,130 @@ public class DashboardFragment extends Fragment {
         super.onDestroy();
         if (controller != null) {
             controller.shutdown();
+        }
+    }
+
+    public void abrirDialogNovoCusto() {
+        if (!isAdded()) {
+            return;
+        }
+        String dataPadraoIso = resolverDataPadraoParaNovoCusto();
+        dialogCustoAtivo = CustoFormDialog.mostrar(
+                requireContext(),
+                null,
+                dataPadraoIso,
+                this::salvarCusto
+        );
+    }
+
+    private void abrirDialogEditarCusto(Custo custo) {
+        if (!isAdded() || custo == null) {
+            return;
+        }
+        dialogCustoAtivo = CustoFormDialog.mostrar(
+                requireContext(),
+                custo,
+                custo.getData(),
+                this::salvarCusto
+        );
+    }
+
+    private void confirmarExclusaoCusto(Custo custo) {
+        if (!isAdded() || custo == null) {
+            return;
+        }
+        String msg = getString(
+                R.string.custo_excluir_mensagem,
+                custo.getDescricao(),
+                FormatadorDashboard.formatarMoeda(custo.getValor())
+        );
+        new AlertDialog.Builder(requireContext())
+                .setTitle(R.string.custo_excluir_titulo)
+                .setMessage(msg)
+                .setPositiveButton(R.string.custo_excluir_confirmar, (dialog, which) -> excluirCusto(custo.getId()))
+                .setNegativeButton(R.string.custo_btn_cancelar, null)
+                .show();
+    }
+
+    private void salvarCusto(Custo custo) {
+        if (controller == null || custo == null) {
+            return;
+        }
+        controller.salvarCusto(custo, new DashboardController.OperacaoCallback() {
+            @Override
+            public void onSucesso() {
+                if (!isAdded()) {
+                    return;
+                }
+                Toast.makeText(requireContext(), R.string.custo_salvo_sucesso, Toast.LENGTH_SHORT).show();
+                controller.recarregarAtual(dashboardCallback);
+            }
+
+            @Override
+            public void onErro(String mensagem) {
+                if (!isAdded()) {
+                    return;
+                }
+                String msg = (mensagem != null && !mensagem.trim().isEmpty())
+                        ? mensagem
+                        : getString(R.string.dashboard_erro_titulo);
+                Toast.makeText(requireContext(), msg, Toast.LENGTH_LONG).show();
+            }
+        });
+    }
+
+    private void excluirCusto(long idCusto) {
+        if (controller == null) {
+            return;
+        }
+        controller.excluirCusto(idCusto, new DashboardController.OperacaoCallback() {
+            @Override
+            public void onSucesso() {
+                if (!isAdded()) {
+                    return;
+                }
+                Toast.makeText(requireContext(), R.string.custo_excluido_sucesso, Toast.LENGTH_SHORT).show();
+                controller.recarregarAtual(dashboardCallback);
+            }
+
+            @Override
+            public void onErro(String mensagem) {
+                if (!isAdded()) {
+                    return;
+                }
+                String msg = (mensagem != null && !mensagem.trim().isEmpty())
+                        ? mensagem
+                        : getString(R.string.dashboard_erro_titulo);
+                Toast.makeText(requireContext(), msg, Toast.LENGTH_LONG).show();
+            }
+        });
+    }
+
+    private String resolverDataPadraoParaNovoCusto() {
+        LocalDate hoje = LocalDate.now();
+        if (dadosAtuais == null || dadosAtuais.getAnoSelecionado() == null) {
+            return hoje.toString();
+        }
+        try {
+            int ano = Integer.parseInt(dadosAtuais.getAnoSelecionado());
+            String mesStr = dadosAtuais.getMesSelecionado();
+            if (mesStr != null && !mesStr.trim().isEmpty()) {
+                int mes = Integer.parseInt(mesStr.trim());
+                if (hoje.getYear() == ano && hoje.getMonthValue() == mes) {
+                    return hoje.toString();
+                }
+                YearMonth ym = YearMonth.of(ano, mes);
+                int dia = Math.min(hoje.getDayOfMonth(), ym.lengthOfMonth());
+                return ym.atDay(dia).toString();
+            }
+            if (hoje.getYear() == ano) {
+                return hoje.toString();
+            }
+            YearMonth ym = YearMonth.of(ano, hoje.getMonthValue());
+            int dia = Math.min(hoje.getDayOfMonth(), ym.lengthOfMonth());
+            return ym.atDay(dia).toString();
+        } catch (Exception ignored) {
+            return hoje.toString();
         }
     }
 
@@ -255,6 +428,9 @@ public class DashboardFragment extends Fragment {
         txtFaturamentoTotal = root.findViewById(R.id.txtFaturamentoTotal);
         txtComparacaoContexto = root.findViewById(R.id.txtComparacaoContexto);
         txtHeroResumoSecundario = root.findViewById(R.id.txtHeroResumoSecundario);
+        txtHeroCustosTotais = root.findViewById(R.id.txtHeroCustosTotais);
+        txtHeroMargemLiquida = root.findViewById(R.id.txtHeroMargemLiquida);
+        txtLucroLiquido = root.findViewById(R.id.txtLucroLiquido);
 
         txtKpiKms = root.findViewById(R.id.txtKpiKms);
         txtKpiReaisPorKm = root.findViewById(R.id.txtKpiReaisPorKm);
@@ -275,7 +451,34 @@ public class DashboardFragment extends Fragment {
         progressComposicaoServico = root.findViewById(R.id.progressComposicaoServico);
 
         txtEvolucaoMedia = root.findViewById(R.id.txtEvolucaoMedia);
+        chipGroupModoGrafico = root.findViewById(R.id.chipGroupModoGrafico);
+        chipGraficoReceitaCustos = root.findViewById(R.id.chipGraficoReceitaCustos);
+        chipGraficoLucro = root.findViewById(R.id.chipGraficoLucro);
+        layoutLegendaGrafico = root.findViewById(R.id.layoutLegendaGrafico);
         evolucaoChart = root.findViewById(R.id.evolucaoChart);
+
+        btnAdicionarCustoCard = root.findViewById(R.id.btnAdicionarCustoCard);
+        txtCardCustosTotal = root.findViewById(R.id.txtCardCustosTotal);
+        txtCardCustosQtd = root.findViewById(R.id.txtCardCustosQtd);
+        progressCustosSobreReceita = root.findViewById(R.id.progressCustosSobreReceita);
+        txtCustosPercentualReceita = root.findViewById(R.id.txtCustosPercentualReceita);
+        layoutCustosVazio = root.findViewById(R.id.layoutCustosVazio);
+
+        recyclerCustos = root.findViewById(R.id.recyclerCustos);
+        recyclerCustos.setLayoutManager(new LinearLayoutManager(requireContext()));
+        recyclerCustos.setNestedScrollingEnabled(false);
+        custoAdapter = new CustoAdapter(new CustoAdapter.OnCustoActionListener() {
+            @Override
+            public void onEditar(Custo custo) {
+                abrirDialogEditarCusto(custo);
+            }
+
+            @Override
+            public void onExcluir(Custo custo) {
+                confirmarExclusaoCusto(custo);
+            }
+        });
+        recyclerCustos.setAdapter(custoAdapter);
 
         recyclerClassificacao = root.findViewById(R.id.recyclerClassificacao);
         recyclerClassificacao.setLayoutManager(new LinearLayoutManager(requireContext()));
@@ -294,6 +497,9 @@ public class DashboardFragment extends Fragment {
                 startActivity(new Intent(requireContext(), ConfiguracaoActivity.class));
             }
         });
+
+        btnRegistrarCustoEmpty = root.findViewById(R.id.btnRegistrarCustoEmpty);
+        btnRegistrarCustoEmpty.setOnClickListener(v -> abrirDialogNovoCusto());
 
         Button btnTentarNovamente = root.findViewById(R.id.btnTentarNovamente);
         btnTentarNovamente.setOnClickListener(v -> {
@@ -330,6 +536,18 @@ public class DashboardFragment extends Fragment {
             controller.selecionarPeriodo(anoAtual, mes, dashboardCallback);
         });
 
+        chipGroupModoGrafico.setOnCheckedStateChangeListener((group, checkedIds) -> {
+            if (checkedIds.isEmpty() || evolucaoChart == null) {
+                return;
+            }
+            int checkedId = checkedIds.get(0);
+            EvolucaoFaturamentoChartView.ModoExibicao modo = checkedId == R.id.chipGraficoLucro
+                    ? EvolucaoFaturamentoChartView.ModoExibicao.LUCRO_LIQUIDO
+                    : EvolucaoFaturamentoChartView.ModoExibicao.RECEITA_E_CUSTOS;
+            evolucaoChart.setModoExibicao(modo);
+            atualizarLegendaEMediaGrafico();
+        });
+
         evolucaoChart.setOnMesSelecionadoListener(mesNumero -> {
             if (dadosAtuais == null || mesNumero == null) {
                 return;
@@ -342,6 +560,8 @@ public class DashboardFragment extends Fragment {
                     : mesNumero;
             controller.selecionarPeriodo(dadosAtuais.getAnoSelecionado(), novoMes, dashboardCallback);
         });
+
+        btnAdicionarCustoCard.setOnClickListener(v -> abrirDialogNovoCusto());
     }
 
     private void mostrarEstado(EstadoTela estado) {
@@ -371,6 +591,19 @@ public class DashboardFragment extends Fragment {
         String labelViagens = totalViagens == 1 ? "1 viagem" : totalViagens + " viagens";
         txtHeroResumoSecundario.setText(
                 labelViagens + " \u2022 Ticket médio " + FormatadorDashboard.formatarMoeda(resumo.getTicketMedio()));
+
+        txtHeroCustosTotais.setText(FormatadorDashboard.formatarMoeda(resumo.getTotalCustos()));
+        Double margem = resumo.getMargemLiquidaPercentual();
+        txtHeroMargemLiquida.setText(margem != null
+                ? FormatadorDashboard.formatarPercentualComSinal(margem)
+                : "--");
+        double lucro = resumo.getLucroLiquido();
+        txtLucroLiquido.setText(FormatadorDashboard.formatarMoeda(lucro));
+        int corLucro = ContextCompat.getColor(
+                requireContext(),
+                lucro >= 0.0 ? R.color.brand_green_dark : R.color.delta_negative
+        );
+        txtLucroLiquido.setTextColor(corLucro);
 
         txtKpiKms.setText(FormatadorDashboard.formatarKms(resumo.getTotalKms()));
         txtKpiReaisPorKm.setText(FormatadorDashboard.formatarReaisPorKm(resumo.getMediaReaisPorKm()));
@@ -402,10 +635,50 @@ public class DashboardFragment extends Fragment {
         renderizarComposicao(resumo);
 
         evolucaoChart.setDados(dados.getEvolucaoAnual(), dados.getMesSelecionado());
-        txtEvolucaoMedia.setText(
-                "Média: " + FormatadorDashboard.formatarMoeda(evolucaoChart.getMediaMensalCalculada()));
+        atualizarLegendaEMediaGrafico();
+
+        renderizarCustosPeriodo(resumo, dados.getCustosDoPeriodo());
 
         classificacaoAdapter.submitList(dados.getRankingClientes());
+    }
+
+    private void atualizarLegendaEMediaGrafico() {
+        if (evolucaoChart == null || txtEvolucaoMedia == null) {
+            return;
+        }
+        boolean modoReceitaCustos = evolucaoChart.getModoExibicao()
+                == EvolucaoFaturamentoChartView.ModoExibicao.RECEITA_E_CUSTOS;
+        if (layoutLegendaGrafico != null) {
+            layoutLegendaGrafico.setVisibility(modoReceitaCustos ? View.VISIBLE : View.GONE);
+        }
+        txtEvolucaoMedia.setText(
+                "Média: " + FormatadorDashboard.formatarMoeda(evolucaoChart.getMediaMensalCalculada()));
+    }
+
+    private void renderizarCustosPeriodo(DashboardResumoDTO resumo, List<Custo> custos) {
+        double totalCustos = resumo.getTotalCustos();
+        int qtd = resumo.getTotalRegistrosCusto();
+        txtCardCustosTotal.setText(FormatadorDashboard.formatarMoeda(totalCustos));
+        txtCardCustosQtd.setText(qtd == 1 ? "1 registro" : qtd + " registros");
+
+        double faturamento = resumo.getFaturamentoTotal();
+        if (faturamento > 0.0) {
+            double percentual = (totalCustos / faturamento) * 100.0;
+            int progresso = (int) Math.round(Math.max(0.0, Math.min(100.0, percentual)));
+            progressCustosSobreReceita.setProgress(progresso);
+            txtCustosPercentualReceita.setText(getString(
+                    R.string.dashboard_custos_sobre_receita,
+                    FormatadorDashboard.formatarPercentual(percentual)
+            ));
+        } else {
+            progressCustosSobreReceita.setProgress(totalCustos > 0.0 ? 100 : 0);
+            txtCustosPercentualReceita.setText(R.string.dashboard_custos_sem_receita);
+        }
+
+        boolean vazio = custos == null || custos.isEmpty();
+        layoutCustosVazio.setVisibility(vazio ? View.VISIBLE : View.GONE);
+        recyclerCustos.setVisibility(vazio ? View.GONE : View.VISIBLE);
+        custoAdapter.submitList(custos);
     }
 
     private void renderizarChipsPeriodo(DashboardDadosDTO dados) {

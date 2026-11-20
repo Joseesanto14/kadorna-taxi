@@ -7,9 +7,11 @@ import android.database.sqlite.SQLiteDatabase;
 import androidx.test.core.app.ApplicationProvider;
 import androidx.test.ext.junit.runners.AndroidJUnit4;
 
+import com.digitalmuniz.kadornataxi.data.dao.CustoDAO;
 import com.digitalmuniz.kadornataxi.data.dao.DashboardDAO;
 import com.digitalmuniz.kadornataxi.data.dao.ViagemDAO;
 import com.digitalmuniz.kadornataxi.data.sqlite.DbHelper;
+import com.digitalmuniz.kadornataxi.model.entities.Custo;
 import com.digitalmuniz.kadornataxi.model.entities.Servico;
 import com.digitalmuniz.kadornataxi.model.entities.Viagem;
 import com.digitalmuniz.kadornataxi.view.dto.ClassificacaoResumoDTO;
@@ -36,6 +38,7 @@ public class DashboardDAOTest {
 
     private DbHelper dbHelper;
     private ViagemDAO viagemDAO;
+    private CustoDAO custoDAO;
     private DashboardDAO dashboardDAO;
 
     @Before
@@ -43,6 +46,7 @@ public class DashboardDAOTest {
         Context context = ApplicationProvider.getApplicationContext();
         dbHelper = new DbHelper(context, null);
         viagemDAO = new ViagemDAO(dbHelper);
+        custoDAO = new CustoDAO(dbHelper);
         dashboardDAO = new DashboardDAO(dbHelper);
     }
 
@@ -238,6 +242,63 @@ public class DashboardDAOTest {
         assertEquals(12, evolucao.size());
         assertEquals(2, ranking.size());
         assertTrue("Consultas do dashboard levaram " + elapsedMs + "ms (limite < 150ms)", elapsedMs < 150L);
+    }
+
+    @Test
+    public void custosELucroLiquido_calculamResumoEvolucaoEPeriodosApenasComCustos() {
+        viagemDAO.inserirLote(Arrays.asList(
+                criarViagem("2026-02-10", "09:00", 50f, 200f, 0f, 0f, 0f, "Comum", 200f),
+                criarViagem("2026-03-10", "10:00", 80f, 400f, 0f, 0f, 0f, "Comum", 400f)
+        ), true);
+
+        custoDAO.inserir(new Custo("Combustível", 100.0, "2026-02-11"));
+        custoDAO.inserir(new Custo("Combustível", 120.0, "2026-03-05"));
+        custoDAO.inserir(new Custo("Pedágio", 30.0, "2026-03-12"));
+        // Mês 04 tem apenas custo, sem nenhuma viagem
+        custoDAO.inserir(new Custo("Manutenção", 250.0, "2026-04-02"));
+        // Ano 2024 tem apenas custo
+        custoDAO.inserir(new Custo("Seguro", 500.0, "2024-11-15"));
+
+        // UNION de anos e meses inclui períodos apenas com custos
+        assertEquals(Arrays.asList("2026", "2024"), dashboardDAO.buscarAnosDisponiveis());
+        assertEquals(Arrays.asList("02", "03", "04"), dashboardDAO.buscarMesesDisponiveisPorAno("2026"));
+        assertEquals(Arrays.asList("11"), dashboardDAO.buscarMesesDisponiveisPorAno("2024"));
+
+        // 2026-03: receita 400, custos 150, lucro 250; anterior 2026-02: receita 200, custos 100, lucro 100
+        DashboardResumoDTO resumoMarco = dashboardDAO.buscarResumoPorPeriodo("2026", "03");
+        assertEquals(150.0, resumoMarco.getTotalCustos(), 0.01);
+        assertEquals(2, resumoMarco.getTotalRegistrosCusto());
+        assertEquals(100.0, resumoMarco.getCustosPeriodoAnterior(), 0.01);
+        assertEquals(250.0, resumoMarco.getLucroLiquido(), 0.01);
+        assertEquals(100.0, resumoMarco.getLucroPeriodoAnterior(), 0.01);
+        assertNotNull(resumoMarco.getMargemLiquidaPercentual());
+        assertEquals(62.5, resumoMarco.getMargemLiquidaPercentual(), 0.01);
+        assertNotNull(resumoMarco.getVariacaoCustosPercentual());
+        assertEquals(50.0, resumoMarco.getVariacaoCustosPercentual(), 0.01);
+        assertNotNull(resumoMarco.getVariacaoLucroPercentual());
+        assertEquals(150.0, resumoMarco.getVariacaoLucroPercentual(), 0.01);
+
+        // 2026-04 (apenas custo): receita 0, custos 250, lucro -250, margem null (sem divisão por zero)
+        DashboardResumoDTO resumoAbril = dashboardDAO.buscarResumoPorPeriodo("2026", "04");
+        assertEquals(0.0, resumoAbril.getFaturamentoTotal(), 0.01);
+        assertEquals(250.0, resumoAbril.getTotalCustos(), 0.01);
+        assertEquals(-250.0, resumoAbril.getLucroLiquido(), 0.01);
+        assertNull(resumoAbril.getMargemLiquidaPercentual());
+
+        // Evolução anual 2026 combina receita e custos nos 12 meses
+        List<FaturamentoMensalDTO> evolucao = dashboardDAO.buscarEvolucaoMensalDoAno("2026");
+        assertEquals(100.0, evolucao.get(1).getTotalCustos(), 0.01);
+        assertEquals(100.0, evolucao.get(1).getLucroLiquido(), 0.01);
+        assertEquals(150.0, evolucao.get(2).getTotalCustos(), 0.01);
+        assertEquals(250.0, evolucao.get(2).getLucroLiquido(), 0.01);
+        assertEquals(250.0, evolucao.get(3).getTotalCustos(), 0.01);
+        assertEquals(-250.0, evolucao.get(3).getLucroLiquido(), 0.01);
+
+        // Lista de custos do período ordenada por data DESC, id_custo DESC
+        List<Custo> custosMarco = dashboardDAO.buscarCustosPorPeriodo("2026", "03");
+        assertEquals(2, custosMarco.size());
+        assertEquals("Pedágio", custosMarco.get(0).getDescricao());
+        assertEquals("Combustível", custosMarco.get(1).getDescricao());
     }
 
     private Viagem criarViagem(
