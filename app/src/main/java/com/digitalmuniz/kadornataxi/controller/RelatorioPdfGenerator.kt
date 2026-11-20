@@ -9,7 +9,6 @@ import android.graphics.Paint
 import android.graphics.RectF
 import android.graphics.pdf.PdfDocument
 import android.os.Environment
-import android.text.Layout
 import android.text.StaticLayout
 import android.text.TextPaint
 import android.util.Log
@@ -54,6 +53,48 @@ class RelatorioPdfGenerator(
         private const val TAG = "RelatorioPdfGenerator"
     }
 
+    data class PageLayoutInfo(
+        val numeroPagina: Int,
+        val qtdLinhas: Int,
+        val yFinalConteudo: Float,
+        val limiteYConteudo: Float,
+        val contemTotais: Boolean,
+        val descricoesLinhas: List<String>,
+        val servicosLinhas: List<String>
+    )
+
+    interface PdfBackend {
+        fun startPage(width: Int, height: Int, pageNumber: Int): Canvas
+        fun finishPage()
+        fun writeTo(outputStream: FileOutputStream)
+        fun close()
+    }
+
+    private class AndroidPdfBackend : PdfBackend {
+        private val document = PdfDocument()
+        private var currentPage: PdfDocument.Page? = null
+
+        override fun startPage(width: Int, height: Int, pageNumber: Int): Canvas {
+            val pageInfo = PdfDocument.PageInfo.Builder(width, height, pageNumber).create()
+            val page = document.startPage(pageInfo)
+            currentPage = page
+            return page.canvas
+        }
+
+        override fun finishPage() {
+            currentPage?.let { document.finishPage(it) }
+            currentPage = null
+        }
+
+        override fun writeTo(outputStream: FileOutputStream) {
+            document.writeTo(outputStream)
+        }
+
+        override fun close() {
+            document.close()
+        }
+    }
+
     private val mesAnoExtenso = converterMesAnoParaExtenso(mesAno)
     private val centroPagina = PAGE_WIDTH / 2f
     private val larguraTabela = ColunasPdf.entries.sumOf { it.larguraPt.toDouble() }.toFloat()
@@ -64,7 +105,10 @@ class RelatorioPdfGenerator(
     private data class LinhaMedida(
         val layouts: List<StaticLayout>,
         val altura: Float,
-        val indiceGlobal: Int
+        val indiceGlobal: Int,
+        val ehLinhaAlta: Boolean,
+        val textoDescricao: String,
+        val textoServicos: String
     )
 
     private data class PaginaPlanejada(
@@ -84,35 +128,20 @@ class RelatorioPdfGenerator(
      * Gera apenas o arquivo PDF (pode ser executado em background thread)
      * e retorna o File salvo no armazenamento do aplicativo.
      */
-    fun gerarArquivoPdf(): File {
-        val document = PdfDocument()
+    @JvmOverloads
+    fun gerarArquivoPdf(backend: PdfBackend = AndroidPdfBackend()): File {
         try {
             val layoutsCabecalhoColunas = criarLayoutsCabecalhoColunas()
             val alturaCabecalhoColunas = layoutsCabecalhoColunas.maxOf { it.height }.toFloat() + (PADDING_CELULA_V * 2f)
             val alturaTopoPagina = calcularAlturaCabecalhoInstitucional() + alturaCabecalhoColunas
             val limiteYConteudo = PAGE_HEIGHT - MARGEM_INFERIOR
 
-            // 1. Medir todas as linhas de viagens
-            val todasLinhasMedidas = listaViagens.mapIndexed { index, viagem ->
-                val layouts = criarLayoutsParaLinha(viagem)
-                val alturaTexto = layouts.maxOf { it.height }.toFloat()
-                LinhaMedida(
-                    layouts = layouts,
-                    altura = alturaTexto + (PADDING_CELULA_V * 2f),
-                    indiceGlobal = index
-                )
-            }
-
-            // 2. Planejar paginação para saber o total exato de páginas ("Página X de Y")
-            val paginas = planejarPaginas(todasLinhasMedidas, alturaTopoPagina, limiteYConteudo)
+            val paginas = planejarPaginas(listaViagens, alturaTopoPagina, limiteYConteudo)
             val totalPaginas = paginas.size
 
-            // 3. Renderizar cada página
             paginas.forEachIndexed { pageIndex, pagina ->
                 val numeroPagina = pageIndex + 1
-                val pageInfo = PdfDocument.PageInfo.Builder(PAGE_WIDTH, PAGE_HEIGHT, numeroPagina).create()
-                val page = document.startPage(pageInfo)
-                val canvas = page.canvas
+                val canvas = backend.startPage(PAGE_WIDTH, PAGE_HEIGHT, numeroPagina)
 
                 var yPos = desenharCabecalhoInstitucional(canvas)
                 yPos = desenharCabecalhoColunas(canvas, yPos, layoutsCabecalhoColunas, alturaCabecalhoColunas)
@@ -128,12 +157,34 @@ class RelatorioPdfGenerator(
                 }
 
                 desenharRodape(canvas, numeroPagina, totalPaginas)
-                document.finishPage(page)
+                backend.finishPage()
             }
 
-            return salvarDocumento(document)
+            return salvarDocumento(backend)
         } finally {
-            document.close()
+            backend.close()
+        }
+    }
+
+    fun inspecionarPaginacao(): List<PageLayoutInfo> {
+        val layoutsCabecalhoColunas = criarLayoutsCabecalhoColunas()
+        val alturaCabecalhoColunas = layoutsCabecalhoColunas.maxOf { it.height }.toFloat() + (PADDING_CELULA_V * 2f)
+        val alturaTopoPagina = calcularAlturaCabecalhoInstitucional() + alturaCabecalhoColunas
+        val limiteYConteudo = PAGE_HEIGHT - MARGEM_INFERIOR
+        val paginas = planejarPaginas(listaViagens, alturaTopoPagina, limiteYConteudo)
+
+        return paginas.mapIndexed { index, pagina ->
+            val yLinhas = pagina.linhas.sumOf { it.altura.toDouble() }.toFloat()
+            val yFinal = alturaTopoPagina + yLinhas + if (pagina.contemTotais) (10f + ALTURA_BLOCO_TOTAIS) else 0f
+            PageLayoutInfo(
+                numeroPagina = index + 1,
+                qtdLinhas = pagina.linhas.size,
+                yFinalConteudo = yFinal,
+                limiteYConteudo = limiteYConteudo,
+                contemTotais = pagina.contemTotais,
+                descricoesLinhas = pagina.linhas.map { it.textoDescricao },
+                servicosLinhas = pagina.linhas.map { it.textoServicos }
+            )
         }
     }
 
@@ -164,10 +215,22 @@ class RelatorioPdfGenerator(
     // --- Planejamento de Paginação ---
 
     private fun planejarPaginas(
-        linhas: List<LinhaMedida>,
+        viagens: List<Viagem>,
         alturaTopoPagina: Float,
         limiteYConteudo: Float
     ): List<PaginaPlanejada> {
+        val alturaDisponivelPagina = (limiteYConteudo - alturaTopoPagina).coerceAtLeast(40f)
+        val linhas = mutableListOf<LinhaMedida>()
+
+        viagens.forEachIndexed { index, viagem ->
+            val linhaCompleta = criarLinhaMedida(viagem, index)
+            if (linhaCompleta.altura <= alturaDisponivelPagina) {
+                linhas.add(linhaCompleta)
+            } else {
+                linhas.addAll(dividirViagemEmSubLinhas(viagem, index, alturaDisponivelPagina))
+            }
+        }
+
         if (linhas.isEmpty()) {
             return listOf(PaginaPlanejada(emptyList(), contemTotais = true))
         }
@@ -201,6 +264,58 @@ class RelatorioPdfGenerator(
         }
 
         return resultado
+    }
+
+    private fun dividirViagemEmSubLinhas(
+        viagem: Viagem,
+        indiceGlobal: Int,
+        alturaDisponivelPagina: Float
+    ): List<LinhaMedida> {
+        val linhasServicos = ColunasPdf.formatarLinhasServicos(viagem)
+        if (linhasServicos.size <= 1) {
+            return listOf(criarLinhaMedida(viagem, indiceGlobal))
+        }
+
+        val subLinhas = mutableListOf<LinhaMedida>()
+        var inicio = 0
+        var isPrimeira = true
+
+        while (inicio < linhasServicos.size) {
+            var melhorFim = inicio + 1
+            var melhorLinha = criarSubLinhaMedida(
+                viagem = viagem,
+                indiceGlobal = indiceGlobal,
+                isPrimeira = isPrimeira,
+                textoServicos = linhasServicos[inicio]
+            )
+
+            // Busca binária do maior prefixo de serviços que cabe em uma página
+            var low = inicio + 2
+            var high = linhasServicos.size
+            while (low <= high) {
+                val mid = (low + high) / 2
+                val candidatoTexto = linhasServicos.subList(inicio, mid).joinToString("\n")
+                val candidato = criarSubLinhaMedida(
+                    viagem = viagem,
+                    indiceGlobal = indiceGlobal,
+                    isPrimeira = isPrimeira,
+                    textoServicos = candidatoTexto
+                )
+                if (candidato.altura <= alturaDisponivelPagina) {
+                    melhorFim = mid
+                    melhorLinha = candidato
+                    low = mid + 1
+                } else {
+                    high = mid - 1
+                }
+            }
+
+            subLinhas.add(melhorLinha)
+            inicio = melhorFim
+            isPrimeira = false
+        }
+
+        return subLinhas
     }
 
     // --- Funções de Desenho ---
@@ -291,7 +406,11 @@ class RelatorioPdfGenerator(
         var x = MARGEM_HORIZONTAL
         linha.layouts.forEachIndexed { index, layout ->
             val coluna = ColunasPdf.entries[index]
-            val offsetVertical = (linha.altura - layout.height) / 2f
+            val offsetVertical = if (linha.ehLinhaAlta) {
+                PADDING_CELULA_V
+            } else {
+                (linha.altura - layout.height) / 2f
+            }
 
             canvas.save()
             canvas.translate(x + PADDING_CELULA_H, yTopo + offsetVertical)
@@ -375,27 +494,70 @@ class RelatorioPdfGenerator(
         }
     }
 
-    private fun criarLayoutsParaLinha(viagem: Viagem): List<StaticLayout> {
-        return ColunasPdf.entries.map { coluna ->
-            val texto = coluna.extrairDado(viagem)
-            val larguraInterna = (coluna.larguraPt - (PADDING_CELULA_H * 2f)).toInt().coerceAtLeast(10)
-            StaticLayout.Builder.obtain(
-                texto,
-                0,
-                texto.length,
-                painter.bodyTextPaint,
-                larguraInterna
-            )
-                .setAlignment(coluna.alinhamento)
-                .setIncludePad(false)
-                .build()
+    private fun criarLinhaMedida(viagem: Viagem, indiceGlobal: Int): LinhaMedida {
+        val textoDescricao = ColunasPdf.DESCRICAO.extrairDado(viagem)
+        val textoServicos = ColunasPdf.SERVICOS.extrairDado(viagem)
+        val layouts = ColunasPdf.entries.map { coluna ->
+            criarLayoutCelula(coluna, coluna.extrairDado(viagem))
         }
+        return construirLinhaMedida(layouts, indiceGlobal, textoDescricao, textoServicos)
+    }
+
+    private fun criarSubLinhaMedida(
+        viagem: Viagem,
+        indiceGlobal: Int,
+        isPrimeira: Boolean,
+        textoServicos: String
+    ): LinhaMedida {
+        val textoDescricao = if (isPrimeira) ColunasPdf.DESCRICAO.extrairDado(viagem) else "Continuação"
+        val layouts = ColunasPdf.entries.map { coluna ->
+            val texto = when {
+                coluna == ColunasPdf.SERVICOS -> textoServicos
+                isPrimeira -> coluna.extrairDado(viagem)
+                coluna == ColunasPdf.DESCRICAO -> "Continuação"
+                else -> ""
+            }
+            criarLayoutCelula(coluna, texto)
+        }
+        return construirLinhaMedida(layouts, indiceGlobal, textoDescricao, textoServicos)
+    }
+
+    private fun criarLayoutCelula(coluna: ColunasPdf, texto: String): StaticLayout {
+        val larguraInterna = (coluna.larguraPt - (PADDING_CELULA_H * 2f)).toInt().coerceAtLeast(10)
+        return StaticLayout.Builder.obtain(
+            texto,
+            0,
+            texto.length,
+            painter.bodyTextPaint,
+            larguraInterna
+        )
+            .setAlignment(coluna.alinhamento)
+            .setIncludePad(false)
+            .build()
+    }
+
+    private fun construirLinhaMedida(
+        layouts: List<StaticLayout>,
+        indiceGlobal: Int,
+        textoDescricao: String,
+        textoServicos: String
+    ): LinhaMedida {
+        val alturaTexto = layouts.maxOf { it.height }.toFloat()
+        val ehLinhaAlta = layouts.any { it.lineCount > 1 }
+        return LinhaMedida(
+            layouts = layouts,
+            altura = alturaTexto + (PADDING_CELULA_V * 2f),
+            indiceGlobal = indiceGlobal,
+            ehLinhaAlta = ehLinhaAlta,
+            textoDescricao = textoDescricao,
+            textoServicos = textoServicos
+        )
     }
 
     private fun calcularResumoFinanceiro() = object {
         val kms = listaViagens.sumOf { it.valorKms.toDouble() }
         val espera = listaViagens.sumOf { it.valorHoraEspera.toDouble() }
-        val servico = listaViagens.sumOf { it.valorServico.toDouble() }
+        val servico = listaViagens.sumOf { it.valorTotalServicos.toDouble() }
         val geral = listaViagens.sumOf { it.valorTotal.toDouble() }
     }
 
@@ -412,7 +574,7 @@ class RelatorioPdfGenerator(
         }
     }
 
-    private fun salvarDocumento(document: PdfDocument): File {
+    private fun salvarDocumento(backend: PdfBackend): File {
         val nomeArquivo = "${FILE_NAME}_${mesAnoExtenso}.pdf"
         val mediaDir = context.getExternalFilesDir(Environment.DIRECTORY_DOCUMENTS)
         if (mediaDir != null && !mediaDir.exists()) {
@@ -422,7 +584,7 @@ class RelatorioPdfGenerator(
 
         try {
             FileOutputStream(arquivo).use { fos ->
-                document.writeTo(fos)
+                backend.writeTo(fos)
                 Log.d(TAG, "PDF salvo em: ${arquivo.absolutePath}")
             }
         } catch (e: IOException) {
