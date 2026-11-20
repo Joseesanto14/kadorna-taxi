@@ -155,28 +155,6 @@
             android:textColor="@android:color/black" />
 
         <TextView
-            android:id="@+id/descricao"
-            android:layout_width="wrap_content"
-            android:layout_height="wrap_content"
-            android:layout_marginStart="24dp"
-            android:layout_marginTop="12dp"
-            android:text="Descrição"
-            android:textColor="@android:color/black"
-            android:textStyle="bold" />
-
-        <EditText
-            android:id="@+id/edDescricao"
-            android:layout_width="match_parent"
-            android:layout_height="wrap_content"
-            android:layout_marginHorizontal="24dp"
-            android:layout_marginTop="4dp"
-            android:background="@drawable/campo"
-            android:hint="Ex: Levar funcionário"
-            android:inputType="textCapSentences"
-            android:padding="12dp"
-            android:textColor="@android:color/black" />
-
-        <TextView
             android:id="@+id/solicitante"
             android:layout_width="wrap_content"
             android:layout_height="wrap_content"
@@ -195,6 +173,28 @@
             android:background="@drawable/campo"
             android:hint="Ex: Marcos (Opcional)"
             android:inputType="textCapWords|textPersonName"
+            android:padding="12dp"
+            android:textColor="@android:color/black" />
+
+        <TextView
+            android:id="@+id/descricao"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:layout_marginStart="24dp"
+            android:layout_marginTop="12dp"
+            android:text="Descrição"
+            android:textColor="@android:color/black"
+            android:textStyle="bold" />
+
+        <EditText
+            android:id="@+id/edDescricao"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_marginHorizontal="24dp"
+            android:layout_marginTop="4dp"
+            android:background="@drawable/campo"
+            android:hint="Ex: Levar funcionário"
+            android:inputType="textCapSentences"
             android:padding="12dp"
             android:textColor="@android:color/black" />
 
@@ -339,29 +339,33 @@
             android:layout_height="wrap_content"
             android:layout_marginHorizontal="24dp"
             android:layout_marginTop="12dp"
-            android:orientation="vertical">
+            android:gravity="center_vertical"
+            android:orientation="horizontal">
 
             <TextView
-                android:layout_width="wrap_content"
+                android:layout_width="0dp"
                 android:layout_height="wrap_content"
-                android:layout_gravity="center"
-                android:text="Valor Serviço (R$)"
+                android:layout_weight="1"
+                android:text="Serviços (Opcional)"
                 android:textColor="@android:color/black"
                 android:textStyle="bold" />
 
-            <EditText
-                android:id="@+id/edValorServico"
-                android:layout_width="match_parent"
-                android:layout_height="wrap_content"
-                android:layout_marginTop="4dp"
-                android:background="@drawable/campo"
-                android:hint="0,00"
-                android:inputType="numberDecimal"
-                android:padding="12dp"
-                android:textColor="@android:color/holo_green_dark"
-                android:textStyle="bold"
-                android:textAlignment="center" />
+            <ImageButton
+                android:id="@+id/btnAdicionarServico"
+                android:layout_width="36dp"
+                android:layout_height="36dp"
+                android:background="@drawable/bt_secondary_selector"
+                android:contentDescription="Adicionar serviço"
+                android:padding="6dp"
+                android:src="@drawable/ic_add" />
         </LinearLayout>
+
+        <LinearLayout
+            android:id="@+id/containerServicos"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_marginHorizontal="24dp"
+            android:orientation="vertical" />
 
         <TextView
             android:id="@+id/txtMotoristaLabel"

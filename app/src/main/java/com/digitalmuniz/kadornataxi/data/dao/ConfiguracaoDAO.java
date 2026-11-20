@@ -63,14 +63,6 @@ public class ConfiguracaoDAO {
                 new String[]{String.valueOf(configuracao.getId())});
     }
 
-    public void setConfiguracaoPadrao() {
-        SQLiteDatabase db = dbHelper.getWritableDatabase();
-        long id = insert(db, new Configuracao(1, 1.99f, 20f,
-                "Marcelo", "Trecho 2",
-                "", "", "", "", ""));
-        Log.d(TAG, "Configuração padrão gerada com o ID: " + id);
-    }
-
     public void configurar(Configuracao configuracao, Context context) {
         if (configExiste()) {
             updateConfiguracao(configuracao);

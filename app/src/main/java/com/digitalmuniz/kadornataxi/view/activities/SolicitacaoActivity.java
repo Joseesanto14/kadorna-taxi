@@ -4,8 +4,11 @@ import android.annotation.SuppressLint;
 import android.os.Bundle;
 import android.text.Editable;
 import android.text.TextWatcher;
+import android.view.LayoutInflater;
 import android.view.View;
 import android.widget.EditText;
+import android.widget.ImageButton;
+import android.widget.LinearLayout;
 import android.widget.Toast;
 
 import androidx.activity.EdgeToEdge;
@@ -19,11 +22,14 @@ import androidx.core.view.WindowInsetsCompat;
 import com.digitalmuniz.kadornataxi.R;
 import com.digitalmuniz.kadornataxi.data.dao.ConfiguracaoDAO;
 import com.digitalmuniz.kadornataxi.data.dao.ViagemDAO;
+import com.digitalmuniz.kadornataxi.model.entities.Servico;
 import com.digitalmuniz.kadornataxi.model.entities.Viagem;
 
 import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.time.LocalTime;
+import java.util.ArrayList;
+import java.util.List;
 import java.util.Locale;
 
 @SuppressLint("SetTextI18n")
@@ -32,11 +38,12 @@ public class SolicitacaoActivity extends AppCompatActivity {
     public static final String EXTRA_VIAGEM = "extra_viagem";
 
     EditText edOrigem, edData, edHora, edDestino, edDescricao, edSolicitante, edKmsRodados, edMotorista, edHoraEspera, edCliente;
-    EditText edValorKm, edValorHoraEspera, edValorTotal, edValorServico;
+    EditText edValorKm, edValorHoraEspera, edValorTotal;
+    LinearLayout containerServicos;
+    ImageButton btnAdicionarServico;
     AppCompatButton btGerarViagem;
 
     private long viagemEditandoId = -1;
-
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
@@ -59,6 +66,7 @@ public class SolicitacaoActivity extends AppCompatActivity {
             btGerarViagem.setText(getString(R.string.editar_viagem));
         } else {
             preencherCampos();
+            adicionarLinhaServico("", 0f, false);
         }
     }
 
@@ -81,7 +89,8 @@ public class SolicitacaoActivity extends AppCompatActivity {
         edMotorista = findViewById(R.id.edMotorista);
         edCliente = findViewById(R.id.edSeparadoCliente);
         edValorTotal = findViewById(R.id.edValorTotal);
-        edValorServico = findViewById(R.id.edValorServico);
+        containerServicos = findViewById(R.id.containerServicos);
+        btnAdicionarServico = findViewById(R.id.btnAdicionarServico);
         btGerarViagem = findViewById(R.id.btGerarViagem);
     }
 
@@ -102,11 +111,12 @@ public class SolicitacaoActivity extends AppCompatActivity {
         edCliente.setText(viagem.getClassificacao());
 
         // Convert ISO date (yyyy-MM-dd) to ddMMyyyy so the TextWatcher formats it as dd/MM/yyyy
-        String[] partes = viagem.getData().split("-");
+        String dataViagem = viagem.getData() != null ? viagem.getData() : "";
+        String[] partes = dataViagem.split("-");
         if (partes.length == 3) {
             edData.setText(partes[2] + partes[1] + partes[0]);
         } else {
-            edData.setText(viagem.getData());
+            edData.setText(dataViagem);
         }
 
         edHora.setText(viagem.getHora());
@@ -121,9 +131,51 @@ public class SolicitacaoActivity extends AppCompatActivity {
             edHoraEspera.setText(String.format(Locale.getDefault(), "%02d%02d", horas, minutos));
         }
 
-        if (viagem.getValorServico() > 0) {
-            long centavos = Math.round(viagem.getValorServico() * 100);
-            edValorServico.setText(String.valueOf(centavos));
+        containerServicos.removeAllViews();
+        List<Servico> servicos = viagem.getServicos();
+        if (!servicos.isEmpty()) {
+            for (Servico servico : servicos) {
+                adicionarLinhaServico(servico.getDescricao(), servico.getValor(), false);
+            }
+        } else if (viagem.getValorServico() > 0f) {
+            adicionarLinhaServico("Serviço adicional", viagem.getValorServico(), false);
+        } else {
+            adicionarLinhaServico("", 0f, false);
+        }
+        atualizarValorTotal();
+    }
+
+    private void adicionarLinhaServico(String descricao, float valor, boolean focarDescricao) {
+        View linha = LayoutInflater.from(this).inflate(R.layout.item_servico_input, containerServicos, false);
+        EditText edServicoDescricao = linha.findViewById(R.id.edServicoDescricao);
+        EditText edServicoValor = linha.findViewById(R.id.edServicoValor);
+        ImageButton btnRemoverServico = linha.findViewById(R.id.btnRemoverServico);
+
+        aplicarMascaraCentavos(edServicoValor);
+
+        if (descricao != null && !descricao.isEmpty()) {
+            edServicoDescricao.setText(descricao);
+        }
+        if (valor > 0f) {
+            long centavos = Math.round(valor * 100);
+            edServicoValor.setText(String.valueOf(centavos));
+        }
+
+        btnRemoverServico.setOnClickListener(v -> {
+            if (containerServicos.getChildCount() > 1) {
+                containerServicos.removeView(linha);
+            } else {
+                edServicoDescricao.setText("");
+                edServicoDescricao.setError(null);
+                edServicoValor.setText("");
+                edServicoValor.setError(null);
+            }
+            atualizarValorTotal();
+        });
+
+        containerServicos.addView(linha);
+        if (focarDescricao) {
+            edServicoDescricao.requestFocus();
         }
     }
 
@@ -131,14 +183,17 @@ public class SolicitacaoActivity extends AppCompatActivity {
         LocalDate data = LocalDateTime.now().toLocalDate();
         LocalTime hora = LocalDateTime.now().toLocalTime();
 
-        String horaStr = hora.toString().replaceAll(":", "").substring(0,4);
+        String horaStr = hora.toString().replaceAll(":", "").substring(0, 4);
         String[] partesData = data.toString().split("-");
         String dataStr = partesData[2] + partesData[1] + partesData[0];
 
-        return new String[] {dataStr, horaStr};
+        return new String[]{dataStr, horaStr};
     }
 
     private boolean todosCamposPreenchidos() {
+        if (!validarLinhasServicos()) {
+            return false;
+        }
         if (edOrigem.getText().toString().isEmpty() ||
                 edData.getText().toString().isEmpty() ||
                 edHora.getText().toString().isEmpty() ||
@@ -146,20 +201,93 @@ public class SolicitacaoActivity extends AppCompatActivity {
                 edDescricao.getText().toString().isEmpty() ||
                 edMotorista.getText().toString().isEmpty() ||
                 edCliente.getText().toString().isEmpty() ||
-                !marcouValor())
-        {
+                !marcouValor()) {
 
             Toast.makeText(this, "Preencha todos os campos", Toast.LENGTH_SHORT).show();
             return false;
-        } else {
-            return true;
         }
+        return true;
+    }
+
+    private boolean validarLinhasServicos() {
+        boolean valido = true;
+        for (int i = 0; i < containerServicos.getChildCount(); i++) {
+            View linha = containerServicos.getChildAt(i);
+            EditText edDesc = linha.findViewById(R.id.edServicoDescricao);
+            EditText edVal = linha.findViewById(R.id.edServicoValor);
+            edDesc.setError(null);
+            edVal.setError(null);
+
+            String desc = edDesc.getText().toString().trim();
+            float valor = parseValorMonetario(edVal.getText().toString());
+
+            if (desc.isEmpty() && valor <= 0f) {
+                continue;
+            }
+            if (valor > 0f && desc.isEmpty()) {
+                edDesc.setError("Informe o serviço");
+                if (valido) {
+                    edDesc.requestFocus();
+                }
+                valido = false;
+            } else if (!desc.isEmpty() && valor <= 0f) {
+                edVal.setError("Informe o valor");
+                if (valido) {
+                    edVal.requestFocus();
+                }
+                valido = false;
+            }
+        }
+        return valido;
     }
 
     private boolean marcouValor() {
-        boolean marcouKm = !edKmsRodados.getText().toString().isEmpty();
-        boolean marcouValorServico = !edValorServico.getText().toString().isEmpty();
-        return Boolean.logicalOr(marcouKm, marcouValorServico);
+        boolean marcouKm = !edKmsRodados.getText().toString().trim().isEmpty();
+        boolean marcouServicoValido = false;
+        for (Servico servico : coletarServicosValidos()) {
+            if (servico.getValor() > 0f) {
+                marcouServicoValido = true;
+                break;
+            }
+        }
+        return marcouKm || marcouServicoValido;
+    }
+
+    private List<Servico> coletarServicosValidos() {
+        List<Servico> servicos = new ArrayList<>();
+        for (int i = 0; i < containerServicos.getChildCount(); i++) {
+            View linha = containerServicos.getChildAt(i);
+            EditText edDesc = linha.findViewById(R.id.edServicoDescricao);
+            EditText edVal = linha.findViewById(R.id.edServicoValor);
+
+            String desc = edDesc.getText().toString().trim();
+            float valor = parseValorMonetario(edVal.getText().toString());
+            if (!desc.isEmpty() && valor > 0f) {
+                servicos.add(new Servico(desc, valor));
+            }
+        }
+        return servicos;
+    }
+
+    private float calcularSomaServicosInputs() {
+        float soma = 0f;
+        for (int i = 0; i < containerServicos.getChildCount(); i++) {
+            View linha = containerServicos.getChildAt(i);
+            EditText edVal = linha.findViewById(R.id.edServicoValor);
+            soma += parseValorMonetario(edVal.getText().toString());
+        }
+        return soma;
+    }
+
+    private float parseValorMonetario(String texto) {
+        if (texto == null || texto.trim().isEmpty()) {
+            return 0f;
+        }
+        try {
+            return Float.parseFloat(texto.trim().replace(",", "."));
+        } catch (NumberFormatException e) {
+            return 0f;
+        }
     }
 
     @NonNull
@@ -172,32 +300,34 @@ public class SolicitacaoActivity extends AppCompatActivity {
             horaEspera = horas + minutosEmHoras;
         }
 
+        List<Servico> servicos = coletarServicosValidos();
         float valorServico = 0f;
-        if (!edValorServico.getText().toString().isEmpty()) {
-            valorServico = Float.parseFloat(edValorServico.getText().toString().replace(",","."));
+        for (Servico servico : servicos) {
+            valorServico += servico.getValor();
         }
 
         float kmsRodados = 0f;
         if (!edKmsRodados.getText().toString().isEmpty()) {
-            kmsRodados = Float.parseFloat(edKmsRodados.getText().toString().replace(",","."));
+            kmsRodados = Float.parseFloat(edKmsRodados.getText().toString().replace(",", "."));
         }
 
-        return new Viagem(
+        Viagem viagem = new Viagem(
                 edOrigem.getText().toString().trim(),
                 edData.getText().toString().trim(),
                 edHora.getText().toString().trim(),
                 edDestino.getText().toString().trim(),
                 edDescricao.getText().toString().trim(),
-                kmsRodados, //calc valor kms
-                horaEspera, //calc valor hora espera
+                kmsRodados,
+                horaEspera,
                 edMotorista.getText().toString().trim(),
                 edCliente.getText().toString().trim(),
                 getApplicationContext(),
                 valorServico,
                 edSolicitante.getText().toString().trim()
         );
+        viagem.setServicos(servicos);
+        return viagem;
     }
-
 
     // --------------- Sessão Listeners ---------------
 
@@ -207,15 +337,18 @@ public class SolicitacaoActivity extends AppCompatActivity {
 
         listenerKmsRodados();
         listenerHoraEspera();
-        listenerValorServico();
+        btnAdicionarServico.setOnClickListener(v -> adicionarLinhaServico("", 0f, true));
     }
 
     private void listenerData() {
         edData.addTextChangedListener(new TextWatcher() {
             private boolean isUpdating = false;
+
             @Override
             public void afterTextChanged(Editable s) {
-                if (isUpdating) { return;}
+                if (isUpdating) {
+                    return;
+                }
                 isUpdating = true;
 
                 String clean = s.toString().replaceAll("[^\\d]", "");
@@ -232,9 +365,9 @@ public class SolicitacaoActivity extends AppCompatActivity {
                     clean = String.format(Locale.getDefault(), "%08d", Long.parseLong(clean));
                 }
 
-                String dia = clean.substring(0,2);
-                String mes = clean.substring(2,4);
-                String ano = clean.substring(4,8);
+                String dia = clean.substring(0, 2);
+                String mes = clean.substring(2, 4);
+                String ano = clean.substring(4, 8);
 
                 String formatado = dia + "/" + mes + "/" + ano;
 
@@ -245,12 +378,10 @@ public class SolicitacaoActivity extends AppCompatActivity {
 
             @Override
             public void beforeTextChanged(CharSequence s, int start, int count, int after) {
-
             }
 
             @Override
             public void onTextChanged(CharSequence s, int start, int before, int count) {
-
             }
         });
     }
@@ -258,9 +389,12 @@ public class SolicitacaoActivity extends AppCompatActivity {
     private void listenerHora() {
         edHora.addTextChangedListener(new TextWatcher() {
             private boolean isUpdating = false;
+
             @Override
             public void afterTextChanged(Editable s) {
-                if (isUpdating) { return;}
+                if (isUpdating) {
+                    return;
+                }
                 isUpdating = true;
 
                 String clean = s.toString().replaceAll("[^\\d]", "");
@@ -277,8 +411,8 @@ public class SolicitacaoActivity extends AppCompatActivity {
                     clean = String.format(Locale.getDefault(), "%04d", Long.parseLong(clean));
                 }
 
-                String horas = clean.substring(0,2);
-                String minutos = clean.substring(2,4);
+                String horas = clean.substring(0, 2);
+                String minutos = clean.substring(2, 4);
 
                 String formatado = horas + ":" + minutos;
 
@@ -290,17 +424,15 @@ public class SolicitacaoActivity extends AppCompatActivity {
 
             @Override
             public void beforeTextChanged(CharSequence s, int start, int count, int after) {
-
             }
 
             @Override
             public void onTextChanged(CharSequence s, int start, int before, int count) {
-
             }
         });
     }
 
-    private void listenerKmsRodados(){
+    private void listenerKmsRodados() {
         edKmsRodados.addTextChangedListener(new TextWatcher() {
             @Override
             public void afterTextChanged(Editable s) {
@@ -311,15 +443,17 @@ public class SolicitacaoActivity extends AppCompatActivity {
             @Override
             public void beforeTextChanged(CharSequence s, int start, int count, int after) {
             }
+
             @Override
             public void onTextChanged(CharSequence s, int start, int before, int count) {
             }
         });
     }
 
-    private void listenerHoraEspera(){
+    private void listenerHoraEspera() {
         edHoraEspera.addTextChangedListener(new TextWatcher() {
             private boolean isUpdating = false;
+
             @Override
             public void afterTextChanged(Editable s) {
                 if (isUpdating) return;
@@ -329,30 +463,25 @@ public class SolicitacaoActivity extends AppCompatActivity {
 
                 if (clean.isEmpty()) {
                     edHoraEspera.setText("");
-                    calcularValorEspera("", edValorHoraEspera); // Passa vazio pra zerar o valor
+                    calcularValorEspera("", edValorHoraEspera);
+                    atualizarValorTotal();
                     isUpdating = false;
                     return;
                 }
 
-                // 3. Limita a 4 números (lógica de fila)
                 if (clean.length() > 4) {
-                    // Pega apenas os últimos 4 dígitos digitados
                     clean = clean.substring(clean.length() - 4);
                 } else {
-                    // Padding com zeros à esquerda (ex: "2" vira "0002")
                     clean = String.format(Locale.getDefault(), "%04d", Long.parseLong(clean));
                 }
 
-                // 4. Monta a máscara HH:MM
                 String hora = clean.substring(0, 2);
                 String minuto = clean.substring(2, 4);
                 String formatado = hora + ":" + minuto;
 
-                // 5. Aplica o texto e reposiciona o cursor no final
                 edHoraEspera.setText(formatado);
                 edHoraEspera.setSelection(formatado.length());
 
-                // 6. Calcula o valor financeiro
                 calcularValorEspera(clean, edValorHoraEspera);
                 atualizarValorTotal();
 
@@ -365,59 +494,54 @@ public class SolicitacaoActivity extends AppCompatActivity {
 
             @Override
             public void onTextChanged(CharSequence s, int start, int before, int count) {
-
             }
-
         });
     }
 
-    private void listenerValorServico() {
-        edValorServico.addTextChangedListener(new TextWatcher() {
+    private void aplicarMascaraCentavos(EditText editText) {
+        editText.addTextChangedListener(new TextWatcher() {
             private boolean estaAtualizando = false;
+
             @Override
             public void afterTextChanged(Editable s) {
                 if (estaAtualizando) return;
                 estaAtualizando = true;
 
-                String valorLimpo = edValorServico.getText().toString().replaceAll("[^\\d]", "");
+                String valorLimpo = editText.getText().toString().replaceAll("[^\\d]", "");
 
                 if (valorLimpo.isEmpty()) {
-                    edValorServico.setText("");
+                    editText.setText("");
+                    atualizarValorTotal();
                     estaAtualizando = false;
                     return;
-                } else if (valorLimpo.length() < 3){
-                    valorLimpo = (String.format(Locale.getDefault(), "%03d", Long.parseLong(valorLimpo)));
-
+                } else if (valorLimpo.length() < 3) {
+                    valorLimpo = String.format(Locale.getDefault(), "%03d", Long.parseLong(valorLimpo));
                 } else if (valorLimpo.length() > 12) {
-                    valorLimpo = valorLimpo.substring(1, valorLimpo.length() - 1);
+                    valorLimpo = valorLimpo.substring(valorLimpo.length() - 12);
                 }
 
-                String real = String.valueOf(Integer.parseInt(valorLimpo.substring(0,valorLimpo.length()-2)));
-                String centavos = valorLimpo.substring(valorLimpo.length()-2);
+                String real = String.valueOf(Long.parseLong(valorLimpo.substring(0, valorLimpo.length() - 2)));
+                String centavos = valorLimpo.substring(valorLimpo.length() - 2);
 
                 String formatado = real + "," + centavos;
 
-                edValorServico.setText(formatado);
-                edValorServico.setSelection(formatado.length());
+                editText.setText(formatado);
+                editText.setSelection(formatado.length());
                 atualizarValorTotal();
                 estaAtualizando = false;
             }
 
             @Override
             public void beforeTextChanged(CharSequence s, int start, int count, int after) {
-
             }
 
             @Override
             public void onTextChanged(CharSequence s, int start, int before, int count) {
-
             }
         });
     }
 
-
     // --------------- Sessão Cálculos ---------------
-
 
     private void calcularValorKm(String kmStr, EditText output) {
         if (kmStr.isEmpty()) {
@@ -439,8 +563,8 @@ public class SolicitacaoActivity extends AppCompatActivity {
             return;
         }
         try {
-            float horas = Float.parseFloat(timeClean.substring(0,2));
-            float minutos = Float.parseFloat(timeClean.substring(2,4));
+            float horas = Float.parseFloat(timeClean.substring(0, 2));
+            float minutos = Float.parseFloat(timeClean.substring(2, 4));
 
             float minutosEmHoras = Math.round(minutos / 60.0f * 100.0f) / 100.0f;
             float tempoEmHoras = horas + minutosEmHoras;
@@ -453,14 +577,13 @@ public class SolicitacaoActivity extends AppCompatActivity {
         }
     }
 
-    private void atualizarValorTotal(){
+    private void atualizarValorTotal() {
         try {
             float valorViagem = edValorKm.getText().toString().isEmpty() ? 0f
                     : Float.parseFloat(edValorKm.getText().toString().replace(",", "."));
             float valorEspera = edValorHoraEspera.getText().toString().isEmpty() ? 0f
                     : Float.parseFloat(edValorHoraEspera.getText().toString().replace(",", "."));
-            float valorServico = edValorServico.getText().toString().isEmpty() ? 0f
-                    : Float.parseFloat(edValorServico.getText().toString().replace(",", "."));
+            float valorServico = calcularSomaServicosInputs();
 
             float valorTotal = valorViagem + valorEspera + valorServico;
             edValorTotal.setText(String.format(Locale.getDefault(), "%.2f", valorTotal));
@@ -469,11 +592,10 @@ public class SolicitacaoActivity extends AppCompatActivity {
         }
     }
 
-
     // --------------- Sessão Database ---------------
 
     public void salvarViagemDb(View view) {
-        if(todosCamposPreenchidos()) {
+        if (todosCamposPreenchidos()) {
             Viagem viagem = criarViagemObjeto();
             if (viagemEditandoId != -1) {
                 viagem.setId(viagemEditandoId);

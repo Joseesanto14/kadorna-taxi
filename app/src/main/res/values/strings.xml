@@ -20,6 +20,8 @@
     <string name="dashboard_kpi_reais_km">R$/KM</string>
     <string name="dashboard_kpi_espera">Horas de Espera</string>
     <string name="dashboard_kpi_media_dia">Média por Dia</string>
+    <string name="dashboard_kpi_total_servicos">Total em Serviços</string>
+    <string name="dashboard_kpi_media_servico">Média por Serviço</string>
     <string name="dashboard_composicao_titulo">Composição da Receita</string>
     <string name="dashboard_composicao_km">KM Rodado</string>
     <string name="dashboard_composicao_espera">Hora de Espera</string>
@@ -36,4 +38,23 @@
     <string name="cd_evolucao_chart">Gráfico de evolução mensal do faturamento</string>
     <string name="cd_delta_icon">Indicador de variação</string>
     <string name="cd_classificacao_icon">Tipo de cliente</string>
+
+    <!-- Detalhes da Viagem -->
+    <string name="detalhes_viagem_titulo">Detalhes da Viagem</string>
+    <string name="detalhes_viagem_fechar">Fechar</string>
+    <string name="cd_fechar_detalhes">Fechar detalhes da viagem</string>
+    <string name="detalhes_classificacao_comum">Comum</string>
+    <string name="detalhes_secao_trajeto">Trajeto</string>
+    <string name="detalhes_secao_informacoes">Informações da Corrida</string>
+    <string name="detalhes_label_descricao">Descrição</string>
+    <string name="detalhes_label_solicitante">Solicitante</string>
+    <string name="detalhes_label_motorista">Motorista</string>
+    <string name="detalhes_secao_valores">Detalhamento de Valores</string>
+    <string name="detalhes_label_km_rodados">KM Rodados</string>
+    <string name="detalhes_label_tempo_espera">Tempo de Espera</string>
+    <string name="detalhes_secao_servicos">Serviços Prestados</string>
+    <string name="detalhes_servicos_vazio">Nenhum serviço adicional registrado.</string>
+    <string name="detalhes_servico_adicional_legado">Serviço adicional</string>
+    <string name="detalhes_subtotal_servicos">Subtotal dos Serviços</string>
+    <string name="detalhes_valor_total">Valor Total</string>
 </resources>

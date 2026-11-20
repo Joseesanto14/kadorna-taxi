@@ -10,6 +10,7 @@ import androidx.test.ext.junit.runners.AndroidJUnit4;
 import com.digitalmuniz.kadornataxi.data.dao.DashboardDAO;
 import com.digitalmuniz.kadornataxi.data.dao.ViagemDAO;
 import com.digitalmuniz.kadornataxi.data.sqlite.DbHelper;
+import com.digitalmuniz.kadornataxi.model.entities.Servico;
 import com.digitalmuniz.kadornataxi.model.entities.Viagem;
 import com.digitalmuniz.kadornataxi.view.dto.ClassificacaoResumoDTO;
 import com.digitalmuniz.kadornataxi.view.dto.DashboardResumoDTO;
@@ -86,10 +87,16 @@ public class DashboardDAOTest {
         assertEquals(1.5, resumoMarco.getTotalHorasEspera(), 0.01);
         assertEquals(50.0, resumoMarco.getTotalValorEspera(), 0.01);
         assertEquals(50.0, resumoMarco.getTotalValorServico(), 0.01);
+        assertEquals(1, resumoMarco.getTotalServicos());
+        assertEquals(1, resumoMarco.getViagensComServico());
+        assertEquals(50.0, resumoMarco.getMediaPorServico(), 0.01);
 
         // Resumo mensal 2026-02 (mês anterior 2026-01 sem dados -> variação null)
         DashboardResumoDTO resumoFev = dashboardDAO.buscarResumoPorPeriodo("2026", "02");
         assertNull(resumoFev.getVariacaoPercentual());
+        assertEquals(1, resumoFev.getTotalServicos());
+        assertEquals(1, resumoFev.getViagensComServico());
+        assertEquals(100.0, resumoFev.getMediaPorServico(), 0.01);
 
         // Resumo anual 2026 (1250.0 vs 1000.0 em 2025 -> +25.0%)
         DashboardResumoDTO resumoAnual2026 = dashboardDAO.buscarResumoPorPeriodo("2026", null);
@@ -98,6 +105,10 @@ public class DashboardDAOTest {
         assertEquals(1000.0, resumoAnual2026.getFaturamentoPeriodoAnterior(), 0.01);
         assertNotNull(resumoAnual2026.getVariacaoPercentual());
         assertEquals(25.0, resumoAnual2026.getVariacaoPercentual(), 0.01);
+        assertEquals(2, resumoAnual2026.getTotalServicos());
+        assertEquals(2, resumoAnual2026.getViagensComServico());
+        assertEquals(150.0, resumoAnual2026.getTotalValorServico(), 0.01);
+        assertEquals(75.0, resumoAnual2026.getMediaPorServico(), 0.01);
 
         // Evolução anual sempre tem 12 meses ("01".."12")
         List<FaturamentoMensalDTO> evolucao2026 = dashboardDAO.buscarEvolucaoMensalDoAno("2026");
@@ -119,6 +130,61 @@ public class DashboardDAOTest {
         assertEquals("Empresa X", rankingMarco.get(1).getClassificacao());
         assertEquals(1, rankingMarco.get(1).getTotalViagens());
         assertEquals(200.0, rankingMarco.get(1).getFaturamentoTotal(), 0.01);
+    }
+
+    @Test
+    public void multiplosServicosPorViagem_calculaMetricasSemProdutoCartesiano() {
+        Viagem v0 = criarViagem("2026-04-01", "08:00", 100f, 200f, 0f, 0f, 0f, "Comum", 200f);
+
+        Viagem v1 = criarViagem("2026-04-02", "09:00", 50f, 100f, 25f, 1f, 25f, "Quartzolit", 150f);
+        v1.setServicos(Arrays.asList(
+                new Servico("Pedágio", 25f)
+        ));
+
+        Viagem v2 = criarViagem("2026-04-03", "10:00", 50f, 100f, 50f, 0f, 0f, "Quartzolit", 150f);
+        v2.setServicos(Arrays.asList(
+                new Servico("Pedágio", 15f),
+                new Servico("Estacionamento", 35f)
+        ));
+
+        Viagem v3 = criarViagem("2026-04-04", "11:00", 100f, 200f, 100f, 0f, 0f, "Empresa Y", 300f);
+        v3.setServicos(Arrays.asList(
+                new Servico("Pedágio", 20f),
+                new Servico("Estacionamento", 30f),
+                new Servico("Balsa", 50f)
+        ));
+
+        Viagem vSemServicoMaio = criarViagem("2026-05-01", "12:00", 20f, 80f, 0f, 0f, 0f, "Comum", 80f);
+
+        assertEquals(5, viagemDAO.inserirLote(Arrays.asList(v0, v1, v2, v3, vSemServicoMaio), true));
+
+        DashboardResumoDTO resumoAbril = dashboardDAO.buscarResumoPorPeriodo("2026", "04");
+        assertEquals(4, resumoAbril.getTotalViagens());
+        assertEquals(4, resumoAbril.getDiasTrabalhados());
+        assertEquals(800.0, resumoAbril.getFaturamentoTotal(), 0.01);
+        assertEquals(300.0, resumoAbril.getTotalKms(), 0.01);
+        assertEquals(600.0, resumoAbril.getTotalValorKm(), 0.01);
+        assertEquals(25.0, resumoAbril.getTotalValorEspera(), 0.01);
+        assertEquals(175.0, resumoAbril.getTotalValorServico(), 0.01);
+        assertEquals(6, resumoAbril.getTotalServicos());
+        assertEquals(3, resumoAbril.getViagensComServico());
+        assertEquals(175.0 / 6.0, resumoAbril.getMediaPorServico(), 0.001);
+
+        double somaComposicao = resumoAbril.getTotalValorKm()
+                + resumoAbril.getTotalValorEspera()
+                + resumoAbril.getTotalValorServico();
+        assertEquals(800.0, somaComposicao, 0.01);
+        assertEquals(75.0, (resumoAbril.getTotalValorKm() / somaComposicao) * 100.0, 0.01);
+        assertEquals(3.125, (resumoAbril.getTotalValorEspera() / somaComposicao) * 100.0, 0.01);
+        assertEquals(21.875, (resumoAbril.getTotalValorServico() / somaComposicao) * 100.0, 0.01);
+
+        DashboardResumoDTO resumoMaio = dashboardDAO.buscarResumoPorPeriodo("2026", "05");
+        assertEquals(1, resumoMaio.getTotalViagens());
+        assertEquals(80.0, resumoMaio.getFaturamentoTotal(), 0.01);
+        assertEquals(0, resumoMaio.getTotalServicos());
+        assertEquals(0, resumoMaio.getViagensComServico());
+        assertEquals(0.0, resumoMaio.getTotalValorServico(), 0.01);
+        assertEquals(0.0, resumoMaio.getMediaPorServico(), 0.01);
     }
 
     @Test

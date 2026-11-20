@@ -9,6 +9,7 @@ import android.widget.TextView;
 
 import androidx.annotation.NonNull;
 import androidx.constraintlayout.widget.ConstraintLayout;
+import androidx.core.content.ContextCompat;
 import androidx.recyclerview.widget.DiffUtil;
 import androidx.recyclerview.widget.ListAdapter;
 import androidx.recyclerview.widget.RecyclerView;
@@ -152,6 +153,7 @@ public class ViagensPaginadoAdapter extends ListAdapter<ListaViagensItem, Recycl
         final TextView txtOrigem;
         final TextView txtDestino;
         final TextView txtKmsRodados;
+        final TextView txtQtdServicos;
         final TextView txtDescricao;
         final TextView txtSolicitante;
         final ImageButton btnEditarViagem;
@@ -164,6 +166,7 @@ public class ViagensPaginadoAdapter extends ListAdapter<ListaViagensItem, Recycl
             txtOrigem = itemView.findViewById(R.id.txtOrigem);
             txtDestino = itemView.findViewById(R.id.txtDestino);
             txtKmsRodados = itemView.findViewById(R.id.txtKmsRodados);
+            txtQtdServicos = itemView.findViewById(R.id.txtQtdServicos);
             txtDescricao = itemView.findViewById(R.id.txtDescricao);
             txtSolicitante = itemView.findViewById(R.id.txtSolicitante);
             btnEditarViagem = itemView.findViewById(R.id.btnEditarViagem);
@@ -172,6 +175,7 @@ public class ViagensPaginadoAdapter extends ListAdapter<ListaViagensItem, Recycl
 
         void bind(Viagem v, OnViagemActionListener listener) {
             if (v == null) {
+                itemView.setOnClickListener(null);
                 return;
             }
             String hora = v.getHora() != null ? v.getHora() : "";
@@ -184,6 +188,7 @@ public class ViagensPaginadoAdapter extends ListAdapter<ListaViagensItem, Recycl
             txtOrigem.setText(v.getOrigem() != null ? v.getOrigem() : "");
             txtDestino.setText(v.getDestino() != null ? v.getDestino() : "");
             txtKmsRodados.setText(v.getKmsRodados() + " km");
+            bindQuantidadeServicos(txtQtdServicos, v);
             txtDescricao.setText(v.getDescricao() != null ? v.getDescricao() : "");
 
             String solicitante = v.getSolicitante();
@@ -194,6 +199,11 @@ public class ViagensPaginadoAdapter extends ListAdapter<ListaViagensItem, Recycl
                 txtSolicitante.setVisibility(View.GONE);
             }
 
+            itemView.setOnClickListener(view -> {
+                if (listener != null) {
+                    listener.onDetalhes(v);
+                }
+            });
             btnEditarViagem.setOnClickListener(view -> {
                 if (listener != null) {
                     listener.onEditar(v);
@@ -205,6 +215,26 @@ public class ViagensPaginadoAdapter extends ListAdapter<ListaViagensItem, Recycl
                 }
             });
         }
+    }
+
+    /**
+     * Formata e estiliza o indicador de quantidade de servicos no card da viagem.
+     */
+    public static void bindQuantidadeServicos(TextView txtQtdServicos, Viagem viagem) {
+        if (txtQtdServicos == null) {
+            return;
+        }
+        int qtd = viagem != null ? viagem.getQuantidadeServicos() : 0;
+        if (qtd <= 0) {
+            txtQtdServicos.setText("0 serviços");
+            txtQtdServicos.setBackgroundResource(R.drawable.bg_pill_gray);
+            txtQtdServicos.setTextColor(ContextCompat.getColor(txtQtdServicos.getContext(), R.color.text_secondary));
+            return;
+        }
+        String texto = qtd == 1 ? "1 serviço" : qtd + " serviços";
+        txtQtdServicos.setText(texto);
+        txtQtdServicos.setBackgroundResource(R.drawable.bg_pill_green_light);
+        txtQtdServicos.setTextColor(ContextCompat.getColor(txtQtdServicos.getContext(), R.color.brand_green_dark));
     }
 
     static class LoadingViewHolder extends RecyclerView.ViewHolder {

@@ -11,9 +11,11 @@ import androidx.core.content.FileProvider;
 import com.digitalmuniz.kadornataxi.data.dao.ConfiguracaoDAO;
 import com.digitalmuniz.kadornataxi.data.dao.ViagemDAO;
 import com.digitalmuniz.kadornataxi.model.entities.Configuracao;
+import com.digitalmuniz.kadornataxi.model.entities.Servico;
 import com.digitalmuniz.kadornataxi.model.entities.Viagem;
 
 import org.json.JSONArray;
+import org.json.JSONException;
 import org.json.JSONObject;
 
 import java.io.BufferedReader;
@@ -26,6 +28,7 @@ import java.io.OutputStreamWriter;
 import java.nio.charset.StandardCharsets;
 import java.text.SimpleDateFormat;
 import java.util.ArrayList;
+import java.util.Collections;
 import java.util.Date;
 import java.util.List;
 import java.util.Locale;
@@ -39,7 +42,7 @@ public class BackupController {
 
     private static final String TAG = "BackupController";
     public static final String APP_SIGNATURE = "KadornaTaxi";
-    public static final int SCHEMA_VERSION = 1;
+    public static final int SCHEMA_VERSION = 2;
 
     /**
      * DTO para pré-visualização dos dados contidos no arquivo antes de confirmar a importação.
@@ -83,51 +86,8 @@ public class BackupController {
 
         List<Viagem> todasViagens = viagemDAO.getAll();
         Configuracao config = configDAO.getConfiguracao();
-
-        JSONObject jsonRoot = new JSONObject();
-        jsonRoot.put("app", APP_SIGNATURE);
-        jsonRoot.put("schema_version", SCHEMA_VERSION);
-        jsonRoot.put("export_timestamp", System.currentTimeMillis());
-
-        String dataFormatada = new SimpleDateFormat("yyyy-MM-dd HH:mm:ss", Locale.getDefault()).format(new Date());
-        jsonRoot.put("export_date", dataFormatada);
-
-        // Serializar Configuração
-        if (config != null) {
-            JSONObject jsonConfig = new JSONObject();
-            jsonConfig.put("valorKmRodado", config.getValorKmRodado());
-            jsonConfig.put("valorHoraEspera", config.getValorHoraEspera());
-            jsonConfig.put("motorista", config.getMotorista() != null ? config.getMotorista() : "");
-            jsonConfig.put("classificacaoViagemSeparada", config.getClassificacaoViagemSeparada() != null ? config.getClassificacaoViagemSeparada() : "Comum");
-            jsonConfig.put("cnpj", config.getCnpj() != null ? config.getCnpj() : "");
-            jsonConfig.put("nomeFantasia", config.getNomeFantasia() != null ? config.getNomeFantasia() : "");
-            jsonConfig.put("titularCNPJ", config.getTitularCNPJ() != null ? config.getTitularCNPJ() : "");
-            jsonConfig.put("telefone", config.getTelefone() != null ? config.getTelefone() : "");
-            jsonConfig.put("email", config.getEmail() != null ? config.getEmail() : "");
-            jsonRoot.put("configuracao", jsonConfig);
-        }
-
-        // Serializar Viagens (preservando todos os valores históricos originais)
-        JSONArray jsonViagens = new JSONArray();
-        for (Viagem v : todasViagens) {
-            JSONObject item = new JSONObject();
-            item.put("origem", v.getOrigem() != null ? v.getOrigem() : "");
-            item.put("data", v.getData() != null ? v.getData() : "");
-            item.put("hora", v.getHora() != null ? v.getHora() : "");
-            item.put("destino", v.getDestino() != null ? v.getDestino() : "");
-            item.put("descricao", v.getDescricao() != null ? v.getDescricao() : "");
-            item.put("kmsRodados", v.getKmsRodados());
-            item.put("valorKms", v.getValorKms());
-            item.put("valorServico", v.getValorServico());
-            item.put("motorista", v.getMotorista() != null ? v.getMotorista() : "");
-            item.put("horaEspera", v.getHoraEspera());
-            item.put("valorHoraEspera", v.getValorHoraEspera());
-            item.put("classificacao", v.getClassificacao() != null ? v.getClassificacao() : "Comum");
-            item.put("valorTotal", v.getValorTotal());
-            item.put("solicitante", v.getSolicitante() != null ? v.getSolicitante() : "");
-            jsonViagens.put(item);
-        }
-        jsonRoot.put("viagens", jsonViagens);
+        JSONObject jsonRoot = construirBackupJson(todasViagens, config);
+        String dataFormatada = jsonRoot.optString("export_date", "");
 
         // Salvar em arquivo no diretório de documentos do app
         File docsDir = context.getExternalFilesDir(Environment.DIRECTORY_DOCUMENTS);
@@ -158,6 +118,66 @@ public class BackupController {
         shareIntent.addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION);
 
         return Intent.createChooser(shareIntent, "Exportar / Compartilhar Backup");
+    }
+
+    public static JSONObject construirBackupJson(List<Viagem> todasViagens, Configuracao config) throws JSONException {
+        JSONObject jsonRoot = new JSONObject();
+        jsonRoot.put("app", APP_SIGNATURE);
+        jsonRoot.put("schema_version", SCHEMA_VERSION);
+        jsonRoot.put("export_timestamp", System.currentTimeMillis());
+
+        String dataFormatada = new SimpleDateFormat("yyyy-MM-dd HH:mm:ss", Locale.getDefault()).format(new Date());
+        jsonRoot.put("export_date", dataFormatada);
+
+        // Serializar Configuração
+        if (config != null) {
+            JSONObject jsonConfig = new JSONObject();
+            jsonConfig.put("valorKmRodado", config.getValorKmRodado());
+            jsonConfig.put("valorHoraEspera", config.getValorHoraEspera());
+            jsonConfig.put("motorista", config.getMotorista() != null ? config.getMotorista() : "");
+            jsonConfig.put("classificacaoViagemSeparada", config.getClassificacaoViagemSeparada() != null ? config.getClassificacaoViagemSeparada() : "Comum");
+            jsonConfig.put("cnpj", config.getCnpj() != null ? config.getCnpj() : "");
+            jsonConfig.put("nomeFantasia", config.getNomeFantasia() != null ? config.getNomeFantasia() : "");
+            jsonConfig.put("titularCNPJ", config.getTitularCNPJ() != null ? config.getTitularCNPJ() : "");
+            jsonConfig.put("telefone", config.getTelefone() != null ? config.getTelefone() : "");
+            jsonConfig.put("email", config.getEmail() != null ? config.getEmail() : "");
+            jsonRoot.put("configuracao", jsonConfig);
+        }
+
+        // Serializar Viagens (preservando todos os valores históricos originais e serviços 1FN)
+        JSONArray jsonViagens = new JSONArray();
+        if (todasViagens != null) {
+            for (Viagem v : todasViagens) {
+                JSONObject item = new JSONObject();
+                item.put("origem", v.getOrigem() != null ? v.getOrigem() : "");
+                item.put("data", v.getData() != null ? v.getData() : "");
+                item.put("hora", v.getHora() != null ? v.getHora() : "");
+                item.put("destino", v.getDestino() != null ? v.getDestino() : "");
+                item.put("descricao", v.getDescricao() != null ? v.getDescricao() : "");
+                item.put("kmsRodados", v.getKmsRodados());
+                item.put("valorKms", v.getValorKms());
+                item.put("valorServico", v.getValorTotalServicos());
+                item.put("motorista", v.getMotorista() != null ? v.getMotorista() : "");
+                item.put("horaEspera", v.getHoraEspera());
+                item.put("valorHoraEspera", v.getValorHoraEspera());
+                item.put("classificacao", v.getClassificacao() != null ? v.getClassificacao() : "Comum");
+                item.put("valorTotal", v.getValorTotal());
+                item.put("solicitante", v.getSolicitante());
+
+                JSONArray jsonServicos = new JSONArray();
+                for (Servico servico : v.getServicos()) {
+                    JSONObject sObj = new JSONObject();
+                    sObj.put("descricao", servico.getDescricao());
+                    sObj.put("valor", servico.getValor());
+                    jsonServicos.put(sObj);
+                }
+                item.put("servicos", jsonServicos);
+
+                jsonViagens.put(item);
+            }
+        }
+        jsonRoot.put("viagens", jsonViagens);
+        return jsonRoot;
     }
 
     /**
@@ -191,6 +211,15 @@ public class BackupController {
      */
     public static ResultadoImportacao importarBackup(Context context, Uri uri, boolean substituirExistentes, boolean restaurarConfiguracao) throws Exception {
         JSONObject root = lerJsonObjectDeUri(context, uri);
+        return importarBackupJson(context, root, substituirExistentes, restaurarConfiguracao);
+    }
+
+    public static ResultadoImportacao importarBackupJson(
+            Context context,
+            JSONObject root,
+            boolean substituirExistentes,
+            boolean restaurarConfiguracao
+    ) throws Exception {
         validarAssinatura(root);
 
         JSONArray viagensArray = root.optJSONArray("viagens");
@@ -209,13 +238,34 @@ public class BackupController {
                 v.setDescricao(item.optString("descricao", ""));
                 v.setKmsRodados((float) item.optDouble("kmsRodados", 0.0));
                 v.setValorKms((float) item.optDouble("valorKms", 0.0));
-                v.setValorServico((float) item.optDouble("valorServico", 0.0));
+                float valorServicoLegado = (float) item.optDouble("valorServico", 0.0);
+                v.setValorServico(valorServicoLegado);
                 v.setMotorista(item.optString("motorista", ""));
                 v.setHoraEspera((float) item.optDouble("horaEspera", 0.0));
                 v.setValorHoraEspera((float) item.optDouble("valorHoraEspera", 0.0));
                 v.setClassificacao(item.optString("classificacao", "Comum"));
-                v.setValorTotal((float) item.optDouble("valorTotal", 0.0));
                 v.setSolicitante(item.optString("solicitante", ""));
+
+                JSONArray servicosArray = item.optJSONArray("servicos");
+                if (servicosArray != null) {
+                    List<Servico> servicos = new ArrayList<>();
+                    for (int j = 0; j < servicosArray.length(); j++) {
+                        JSONObject sObj = servicosArray.optJSONObject(j);
+                        if (sObj != null) {
+                            String desc = sObj.optString("descricao", "").trim();
+                            float val = (float) sObj.optDouble("valor", 0.0);
+                            if (!desc.isEmpty() || val > 0f) {
+                                servicos.add(new Servico(desc.isEmpty() ? "Serviço adicional" : desc, val));
+                            }
+                        }
+                    }
+                    v.setServicos(servicos);
+                } else if (valorServicoLegado > 0f) {
+                    v.setServicos(Collections.singletonList(new Servico("Serviço adicional", valorServicoLegado)));
+                }
+
+                // Preserva o valorTotal histórico depois de setar os serviços
+                v.setValorTotal((float) item.optDouble("valorTotal", 0.0));
 
                 listaViagens.add(v);
             }
