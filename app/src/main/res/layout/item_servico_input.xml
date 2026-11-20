@@ -1,0 +1,45 @@
+<?xml version="1.0" encoding="utf-8"?>
+<LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    android:layout_width="match_parent"
+    android:layout_height="wrap_content"
+    android:layout_marginTop="8dp"
+    android:background="@drawable/campo"
+    android:gravity="center_vertical"
+    android:orientation="horizontal"
+    android:padding="12dp">
+
+    <EditText
+        android:id="@+id/edServicoDescricao"
+        android:layout_width="0dp"
+        android:layout_height="wrap_content"
+        android:layout_weight="1"
+        android:background="@android:color/transparent"
+        android:hint="Ex: Pedágio"
+        android:inputType="textCapSentences"
+        android:minHeight="36dp"
+        android:paddingHorizontal="4dp"
+        android:textColor="@android:color/black" />
+
+    <EditText
+        android:id="@+id/edServicoValor"
+        android:layout_width="112dp"
+        android:layout_height="wrap_content"
+        android:layout_marginStart="8dp"
+        android:background="@android:color/transparent"
+        android:hint="0,00"
+        android:inputType="numberDecimal"
+        android:minHeight="36dp"
+        android:paddingHorizontal="4dp"
+        android:textAlignment="center"
+        android:textColor="@android:color/holo_green_dark"
+        android:textStyle="bold" />
+
+    <ImageButton
+        android:id="@+id/btnRemoverServico"
+        android:layout_width="36dp"
+        android:layout_height="36dp"
+        android:layout_marginStart="4dp"
+        android:background="?attr/selectableItemBackgroundBorderless"
+        android:contentDescription="Remover serviço"
+        android:src="@drawable/ic_delete" />
+</LinearLayout>
