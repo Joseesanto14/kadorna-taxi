@@ -3,6 +3,7 @@ package com.digitalmuniz.kadornataxi;
 import android.app.Dialog;
 import android.os.Looper;
 import android.view.View;
+import android.view.ViewGroup;
 import android.widget.FrameLayout;
 import android.widget.ImageButton;
 import android.widget.LinearLayout;
@@ -385,5 +386,60 @@ public class ViagemDetalhesDialogTest {
 
         assertNull(ViagemDetalhesDialog.mostrar(activity, null));
         assertNull(ViagemDetalhesDialog.mostrar(null, viagemNula));
+    }
+
+    @Test
+    public void mostrar_layoutDetalheSolicitanteApareceAntesDeTxtDetalheDescricaoNaHierarquia() {
+        Viagem viagem = new Viagem(
+                5L,
+                "Origem",
+                "2026-11-20",
+                "11:00",
+                "Destino",
+                "Entrega prioritária",
+                10.0f,
+                30.00f,
+                0f,
+                "Marcelo",
+                0f,
+                0f,
+                "Quartzolit",
+                30.00f,
+                "Carlos Eduardo"
+        );
+
+        Dialog dialog = ViagemDetalhesDialog.mostrar(activity, viagem);
+        assertNotNull(dialog);
+        assertTrue(dialog.isShowing());
+
+        View scroll = dialog.findViewById(R.id.scrollDetalhesViagem);
+        assertNotNull(scroll);
+
+        List<Integer> ids = new ArrayList<>();
+        coletarIds(scroll, ids);
+
+        int idxSolicitante = ids.indexOf(R.id.layoutDetalheSolicitante);
+        int idxDescricao = ids.indexOf(R.id.txtDetalheDescricao);
+        assertTrue(idxSolicitante != -1 && idxDescricao != -1);
+        assertTrue(
+                "layoutDetalheSolicitante deveria aparecer antes de txtDetalheDescricao",
+                idxSolicitante < idxDescricao
+        );
+        assertEquals(View.VISIBLE, dialog.findViewById(R.id.layoutDetalheSolicitante).getVisibility());
+
+        dialog.findViewById(R.id.btnFecharDetalhes).performClick();
+        assertFalse(dialog.isShowing());
+    }
+
+    private void coletarIds(View view, List<Integer> ids) {
+        if (view.getId() != View.NO_ID) {
+            ids.add(view.getId());
+        }
+        if (view instanceof ViewGroup) {
+            ViewGroup vg = (ViewGroup) view;
+            for (int i = 0; i < vg.getChildCount(); i++) {
+                coletarIds(vg.getChildAt(i), ids);
+            }
+        }
     }
 }
