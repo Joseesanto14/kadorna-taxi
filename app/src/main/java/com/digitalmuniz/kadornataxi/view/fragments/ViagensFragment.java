@@ -21,6 +21,7 @@ import com.digitalmuniz.kadornataxi.model.entities.Viagem;
 import com.digitalmuniz.kadornataxi.view.activities.ConfiguracaoActivity;
 import com.digitalmuniz.kadornataxi.view.activities.SolicitacaoActivity;
 import com.digitalmuniz.kadornataxi.view.adapters.ViagensPaginadoAdapter;
+import com.digitalmuniz.kadornataxi.view.dialogs.ViagemDetalhesDialog;
 import com.digitalmuniz.kadornataxi.view.dto.ListaViagensItem;
 import com.digitalmuniz.kadornataxi.view.dto.ViagensFiltro;
 import com.digitalmuniz.kadornataxi.view.interfaces.OnViagemActionListener;
@@ -187,6 +188,14 @@ public class ViagensFragment extends Fragment {
                                         controller.excluirViagem(viagem, listaCallback))
                                 .setNegativeButton("Cancelar", null)
                                 .show();
+                    }
+
+                    @Override
+                    public void onDetalhes(Viagem viagem) {
+                        if (!isAdded() || viagem == null) {
+                            return;
+                        }
+                        ViagemDetalhesDialog.mostrar(requireContext(), viagem);
                     }
                 }
         );
