@@ -35,21 +35,34 @@
 
             <TextView
                 android:id="@+id/SolicitaçãodeTaxi"
-                android:layout_width="wrap_content"
+                android:layout_width="match_parent"
                 android:layout_height="wrap_content"
                 android:layout_centerInParent="true"
+                android:layout_marginHorizontal="72dp"
+                android:autoSizeMaxTextSize="22sp"
+                android:autoSizeMinTextSize="16sp"
+                android:autoSizeStepGranularity="0.5sp"
+                android:autoSizeTextType="uniform"
+                android:gravity="center"
+                android:maxLines="1"
                 android:text="Solicitação de Táxi"
                 android:textColor="@android:color/black"
-                android:textSize="24dp"
+                android:textSize="22sp"
                 android:textStyle="bold" />
         </RelativeLayout>
 
         <TextView
-            android:layout_width="wrap_content"
+            android:layout_width="match_parent"
             android:layout_height="wrap_content"
-            android:layout_marginStart="24dp"
+            android:layout_marginHorizontal="24dp"
+            android:autoSizeMaxTextSize="14sp"
+            android:autoSizeMinTextSize="11sp"
+            android:autoSizeStepGranularity="0.5sp"
+            android:autoSizeTextType="uniform"
+            android:maxLines="1"
             android:text="Origem"
             android:textColor="@android:color/black"
+            android:textSize="14sp"
             android:textStyle="bold" />
 
         <EditText
@@ -82,24 +95,43 @@
 
                 <TextView
                     android:id="@+id/data"
-                    android:layout_width="wrap_content"
-                    android:layout_height="wrap_content"
-                    android:layout_gravity="center"
-                    android:text="Data"
-                    android:textColor="@android:color/black"
-                    android:textStyle="bold" />
+                    style="@style/FormLabelTwoColumn"
+                    android:text="Data" />
 
-                <EditText
-                    android:id="@+id/edData"
+                <FrameLayout
                     android:layout_width="match_parent"
                     android:layout_height="wrap_content"
-                    android:layout_marginTop="4dp"
-                    android:background="@drawable/campo"
-                    android:hint="05/01/2026"
-                    android:inputType="date"
-                    android:padding="12dp"
-                    android:textColor="@android:color/black"
-                    android:textAlignment="center" />
+                    android:layout_marginTop="4dp">
+
+                    <EditText
+                        android:id="@+id/edData"
+                        android:layout_width="match_parent"
+                        android:layout_height="wrap_content"
+                        android:background="@drawable/campo"
+                        android:hint="05/01/2026"
+                        android:inputType="date"
+                        android:maxLines="1"
+                        android:paddingStart="12dp"
+                        android:paddingTop="12dp"
+                        android:paddingEnd="44dp"
+                        android:paddingBottom="12dp"
+                        android:singleLine="true"
+                        android:textAlignment="center"
+                        android:textColor="@android:color/black" />
+
+                    <ImageButton
+                        android:id="@+id/btnSelecionarDataViagem"
+                        android:layout_width="36dp"
+                        android:layout_height="36dp"
+                        android:layout_gravity="end|center_vertical"
+                        android:layout_marginEnd="6dp"
+                        android:background="?attr/selectableItemBackgroundBorderless"
+                        android:contentDescription="Selecionar data"
+                        android:padding="6dp"
+                        android:scaleType="centerInside"
+                        android:src="@drawable/ic_calendar_today"
+                        app:tint="@color/brand_green_dark" />
+                </FrameLayout>
             </LinearLayout>
 
             <LinearLayout
@@ -111,12 +143,8 @@
 
                 <TextView
                     android:id="@+id/hora"
-                    android:layout_width="wrap_content"
-                    android:layout_height="wrap_content"
-                    android:layout_gravity="center"
-                    android:text="Hora"
-                    android:textColor="@android:color/black"
-                    android:textStyle="bold" />
+                    style="@style/FormLabelTwoColumn"
+                    android:text="Hora" />
 
                 <EditText
                     android:id="@+id/edHora"
@@ -126,20 +154,29 @@
                     android:background="@drawable/campo"
                     android:hint="12:30"
                     android:inputType="time"
-                    android:padding="12dp"
-                    android:textColor="@android:color/black"
-                    android:textAlignment="center" />
+                    android:maxLines="1"
+                    android:paddingHorizontal="8dp"
+                    android:paddingVertical="12dp"
+                    android:singleLine="true"
+                    android:textAlignment="center"
+                    android:textColor="@android:color/black" />
             </LinearLayout>
         </LinearLayout>
 
         <TextView
             android:id="@+id/destino"
-            android:layout_width="wrap_content"
+            android:layout_width="match_parent"
             android:layout_height="wrap_content"
-            android:layout_marginStart="24dp"
+            android:layout_marginHorizontal="24dp"
             android:layout_marginTop="12dp"
+            android:autoSizeMaxTextSize="14sp"
+            android:autoSizeMinTextSize="11sp"
+            android:autoSizeStepGranularity="0.5sp"
+            android:autoSizeTextType="uniform"
+            android:maxLines="1"
             android:text="Destino"
             android:textColor="@android:color/black"
+            android:textSize="14sp"
             android:textStyle="bold" />
 
         <EditText
@@ -156,12 +193,18 @@
 
         <TextView
             android:id="@+id/solicitante"
-            android:layout_width="wrap_content"
+            android:layout_width="match_parent"
             android:layout_height="wrap_content"
-            android:layout_marginStart="24dp"
+            android:layout_marginHorizontal="24dp"
             android:layout_marginTop="12dp"
+            android:autoSizeMaxTextSize="14sp"
+            android:autoSizeMinTextSize="11sp"
+            android:autoSizeStepGranularity="0.5sp"
+            android:autoSizeTextType="uniform"
+            android:maxLines="1"
             android:text="Solicitante"
             android:textColor="@android:color/black"
+            android:textSize="14sp"
             android:textStyle="bold" />
 
         <EditText
@@ -178,12 +221,18 @@
 
         <TextView
             android:id="@+id/descricao"
-            android:layout_width="wrap_content"
+            android:layout_width="match_parent"
             android:layout_height="wrap_content"
-            android:layout_marginStart="24dp"
+            android:layout_marginHorizontal="24dp"
             android:layout_marginTop="12dp"
+            android:autoSizeMaxTextSize="14sp"
+            android:autoSizeMinTextSize="11sp"
+            android:autoSizeStepGranularity="0.5sp"
+            android:autoSizeTextType="uniform"
+            android:maxLines="1"
             android:text="Descrição"
             android:textColor="@android:color/black"
+            android:textSize="14sp"
             android:textStyle="bold" />
 
         <EditText
@@ -214,12 +263,8 @@
                 android:orientation="vertical">
 
                 <TextView
-                    android:layout_width="wrap_content"
-                    android:layout_height="wrap_content"
-                    android:layout_gravity="center"
-                    android:text="Km Rodados"
-                    android:textColor="@android:color/black"
-                    android:textStyle="bold" />
+                    style="@style/FormLabelTwoColumn"
+                    android:text="Km Rodados" />
 
                 <EditText
                     android:id="@+id/edKmRodados"
@@ -229,9 +274,12 @@
                     android:background="@drawable/campo"
                     android:hint="Ex: 34"
                     android:inputType="numberDecimal"
-                    android:padding="12dp"
-                    android:textColor="@android:color/black"
-                    android:textAlignment="center" />
+                    android:maxLines="1"
+                    android:paddingHorizontal="8dp"
+                    android:paddingVertical="12dp"
+                    android:singleLine="true"
+                    android:textAlignment="center"
+                    android:textColor="@android:color/black" />
             </LinearLayout>
 
             <LinearLayout
@@ -242,12 +290,8 @@
                 android:orientation="vertical">
 
                 <TextView
-                    android:layout_width="wrap_content"
-                    android:layout_height="wrap_content"
-                    android:layout_gravity="center"
-                    android:text="Valor da Viagem(R$)"
-                    android:textColor="@android:color/black"
-                    android:textStyle="bold" />
+                    style="@style/FormLabelTwoColumn"
+                    android:text="Valor da Viagem (R$)" />
 
                 <EditText
                     android:id="@+id/edValorKm"
@@ -255,14 +299,17 @@
                     android:layout_height="wrap_content"
                     android:layout_marginTop="4dp"
                     android:background="@drawable/campo"
-                    android:focusable="false"
                     android:clickable="false"
                     android:cursorVisible="false"
+                    android:focusable="false"
                     android:hint="0,00"
-                    android:padding="12dp"
+                    android:maxLines="1"
+                    android:paddingHorizontal="8dp"
+                    android:paddingVertical="12dp"
+                    android:singleLine="true"
+                    android:textAlignment="center"
                     android:textColor="@android:color/holo_green_dark"
-                    android:textStyle="bold"
-                    android:textAlignment="center" />
+                    android:textStyle="bold" />
             </LinearLayout>
         </LinearLayout>
 
@@ -282,12 +329,8 @@
                 android:orientation="vertical">
 
                 <TextView
-                    android:layout_width="wrap_content"
-                    android:layout_height="wrap_content"
-                    android:layout_gravity="center"
-                    android:text="Hora Espera"
-                    android:textColor="@android:color/black"
-                    android:textStyle="bold" />
+                    style="@style/FormLabelTwoColumn"
+                    android:text="Hora Espera" />
 
                 <EditText
                     android:id="@+id/edHoraEspera"
@@ -297,9 +340,12 @@
                     android:background="@drawable/campo"
                     android:hint="HH:MM"
                     android:inputType="number"
-                    android:padding="12dp"
-                    android:textColor="@android:color/black"
-                    android:textAlignment="center" />
+                    android:maxLines="1"
+                    android:paddingHorizontal="8dp"
+                    android:paddingVertical="12dp"
+                    android:singleLine="true"
+                    android:textAlignment="center"
+                    android:textColor="@android:color/black" />
             </LinearLayout>
 
             <LinearLayout
@@ -310,12 +356,8 @@
                 android:orientation="vertical">
 
                 <TextView
-                    android:layout_width="wrap_content"
-                    android:layout_height="wrap_content"
-                    android:layout_gravity="center"
-                    android:text="Valor Espera (R$)"
-                    android:textColor="@android:color/black"
-                    android:textStyle="bold" />
+                    style="@style/FormLabelTwoColumn"
+                    android:text="Valor Espera (R$)" />
 
                 <EditText
                     android:id="@+id/edValorHoraEspera"
@@ -323,14 +365,17 @@
                     android:layout_height="wrap_content"
                     android:layout_marginTop="4dp"
                     android:background="@drawable/campo"
-                    android:focusable="false"
                     android:clickable="false"
                     android:cursorVisible="false"
+                    android:focusable="false"
                     android:hint="0,00"
-                    android:padding="12dp"
+                    android:maxLines="1"
+                    android:paddingHorizontal="8dp"
+                    android:paddingVertical="12dp"
+                    android:singleLine="true"
+                    android:textAlignment="center"
                     android:textColor="@android:color/holo_green_dark"
-                    android:textStyle="bold"
-                    android:textAlignment="center" />
+                    android:textStyle="bold" />
             </LinearLayout>
         </LinearLayout>
 
@@ -346,18 +391,68 @@
                 android:layout_width="0dp"
                 android:layout_height="wrap_content"
                 android:layout_weight="1"
+                android:autoSizeMaxTextSize="14sp"
+                android:autoSizeMinTextSize="11sp"
+                android:autoSizeStepGranularity="0.5sp"
+                android:autoSizeTextType="uniform"
+                android:maxLines="1"
                 android:text="Serviços (Opcional)"
                 android:textColor="@android:color/black"
+                android:textSize="14sp"
                 android:textStyle="bold" />
 
             <ImageButton
                 android:id="@+id/btnAdicionarServico"
-                android:layout_width="36dp"
-                android:layout_height="36dp"
+                android:layout_width="32dp"
+                android:layout_height="32dp"
                 android:background="@drawable/bt_secondary_selector"
                 android:contentDescription="Adicionar serviço"
                 android:padding="6dp"
+                android:scaleType="centerInside"
                 android:src="@drawable/ic_add" />
+        </LinearLayout>
+
+        <LinearLayout
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_marginHorizontal="24dp"
+            android:layout_marginTop="6dp"
+            android:baselineAligned="false"
+            android:orientation="horizontal">
+
+            <TextView
+                android:layout_width="0dp"
+                android:layout_height="wrap_content"
+                android:layout_marginEnd="8dp"
+                android:layout_weight="1"
+                android:autoSizeMaxTextSize="12sp"
+                android:autoSizeMinTextSize="10sp"
+                android:autoSizeStepGranularity="0.5sp"
+                android:autoSizeTextType="uniform"
+                android:maxLines="1"
+                android:singleLine="true"
+                android:text="Descrição do Serviço"
+                android:textColor="@color/text_secondary"
+                android:textSize="12sp"
+                android:textStyle="bold" />
+
+            <TextView
+                android:layout_width="0dp"
+                android:layout_height="wrap_content"
+                android:layout_marginStart="8dp"
+                android:layout_marginEnd="36dp"
+                android:layout_weight="1"
+                android:autoSizeMaxTextSize="12sp"
+                android:autoSizeMinTextSize="10sp"
+                android:autoSizeStepGranularity="0.5sp"
+                android:autoSizeTextType="uniform"
+                android:gravity="center_horizontal"
+                android:maxLines="1"
+                android:singleLine="true"
+                android:text="Valor (R$)"
+                android:textColor="@color/text_secondary"
+                android:textSize="12sp"
+                android:textStyle="bold" />
         </LinearLayout>
 
         <LinearLayout
@@ -369,12 +464,18 @@
 
         <TextView
             android:id="@+id/txtMotoristaLabel"
-            android:layout_width="wrap_content"
+            android:layout_width="match_parent"
             android:layout_height="wrap_content"
-            android:layout_marginStart="24dp"
+            android:layout_marginHorizontal="24dp"
             android:layout_marginTop="12dp"
+            android:autoSizeMaxTextSize="14sp"
+            android:autoSizeMinTextSize="11sp"
+            android:autoSizeStepGranularity="0.5sp"
+            android:autoSizeTextType="uniform"
+            android:maxLines="1"
             android:text="Motorista"
             android:textColor="@android:color/black"
+            android:textSize="14sp"
             android:textStyle="bold" />
 
         <EditText
@@ -405,12 +506,8 @@
                 android:orientation="vertical">
 
                 <TextView
-                    android:layout_width="wrap_content"
-                    android:layout_height="wrap_content"
-                    android:layout_gravity="center"
-                    android:text="Serviço prestado para:"
-                    android:textColor="@android:color/black"
-                    android:textStyle="bold" />
+                    style="@style/FormLabelTwoColumn"
+                    android:text="Serviço prestado para:" />
 
                 <EditText
                     android:id="@+id/edSeparadoCliente"
@@ -420,9 +517,12 @@
                     android:background="@drawable/campo"
                     android:hint="Ex: Prefeitura"
                     android:inputType="textCapWords"
-                    android:padding="12dp"
-                    android:textColor="@android:color/black"
-                    android:textAlignment="center" />
+                    android:maxLines="1"
+                    android:paddingHorizontal="8dp"
+                    android:paddingVertical="12dp"
+                    android:singleLine="true"
+                    android:textAlignment="center"
+                    android:textColor="@android:color/black" />
             </LinearLayout>
 
             <LinearLayout
@@ -433,12 +533,8 @@
                 android:orientation="vertical">
 
                 <TextView
-                    android:layout_width="wrap_content"
-                    android:layout_height="wrap_content"
-                    android:layout_gravity="center"
-                    android:text="Valor Total (R$)"
-                    android:textColor="@android:color/black"
-                    android:textStyle="bold" />
+                    style="@style/FormLabelTwoColumn"
+                    android:text="Valor Total (R$)" />
 
                 <EditText
                     android:id="@+id/edValorTotal"
@@ -450,7 +546,10 @@
                     android:cursorVisible="false"
                     android:focusable="false"
                     android:hint="0,00"
-                    android:padding="12dp"
+                    android:maxLines="1"
+                    android:paddingHorizontal="8dp"
+                    android:paddingVertical="12dp"
+                    android:singleLine="true"
                     android:textAlignment="center"
                     android:textColor="@android:color/holo_green_dark"
                     android:textStyle="bold" />

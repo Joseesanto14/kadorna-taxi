@@ -10,10 +10,12 @@ import androidx.test.core.app.ApplicationProvider;
 import androidx.test.ext.junit.runners.AndroidJUnit4;
 
 import com.digitalmuniz.kadornataxi.data.dao.ConfiguracaoDAO;
+import com.digitalmuniz.kadornataxi.data.dao.CustoDAO;
 import com.digitalmuniz.kadornataxi.data.dao.ServicoDAO;
 import com.digitalmuniz.kadornataxi.data.dao.ViagemDAO;
 import com.digitalmuniz.kadornataxi.data.sqlite.DbHelper;
 import com.digitalmuniz.kadornataxi.model.entities.Configuracao;
+import com.digitalmuniz.kadornataxi.model.entities.Custo;
 import com.digitalmuniz.kadornataxi.model.entities.Servico;
 import com.digitalmuniz.kadornataxi.model.entities.Viagem;
 
@@ -84,29 +86,32 @@ public class DbHelperMigrationTest {
         v4Db.insertOrThrow(DbHelper.Viagem.NOME_TABELA, null, viagem);
         legacyHelper.close();
 
-        // Abre na versão 7 via DbHelper
-        DbHelper v7Helper = new DbHelper(context, dbName);
-        SQLiteDatabase v7Db = v7Helper.getWritableDatabase();
+        // Abre na versão 8 via DbHelper
+        DbHelper v8Helper = new DbHelper(context, dbName);
+        SQLiteDatabase v8Db = v8Helper.getWritableDatabase();
         try {
-            assertEquals(7, DbHelper.DATABASE_VERSION);
-            assertEquals(DbHelper.DATABASE_VERSION, v7Db.getVersion());
+            assertEquals(8, DbHelper.DATABASE_VERSION);
+            assertEquals(DbHelper.DATABASE_VERSION, v8Db.getVersion());
 
             // Verifica WAL habilitado
-            try (Cursor journalCursor = v7Db.rawQuery("PRAGMA journal_mode", null)) {
+            try (Cursor journalCursor = v8Db.rawQuery("PRAGMA journal_mode", null)) {
                 assertTrue(journalCursor.moveToFirst());
                 assertEquals("wal", journalCursor.getString(0).toLowerCase());
             }
 
-            // Verifica índices via PRAGMA index_list('viagem') e ('servico')
-            Set<String> indicesViagem = listarIndices(v7Db, DbHelper.Viagem.NOME_TABELA);
+            // Verifica índices via PRAGMA index_list('viagem'), ('servico') e ('custo')
+            Set<String> indicesViagem = listarIndices(v8Db, DbHelper.Viagem.NOME_TABELA);
             assertTrue(indicesViagem.contains("idx_viagem_data_hora_id"));
             assertTrue(indicesViagem.contains("idx_viagem_classif_data_hora_id"));
 
-            Set<String> indicesServico = listarIndices(v7Db, DbHelper.Servico.NOME_TABELA);
+            Set<String> indicesServico = listarIndices(v8Db, DbHelper.Servico.NOME_TABELA);
             assertTrue(indicesServico.contains("idx_servico_viagem_id"));
 
+            Set<String> indicesCusto = listarIndices(v8Db, DbHelper.Custo.NOME_TABELA);
+            assertTrue(indicesCusto.contains("idx_custo_data_id"));
+
             // Verifica preservação de dados e migração do serviço legado
-            ViagemDAO viagemDAO = new ViagemDAO(v7Helper);
+            ViagemDAO viagemDAO = new ViagemDAO(v8Helper);
             List<Viagem> viagens = viagemDAO.getAll();
             assertEquals(1, viagens.size());
             assertEquals("Corrida legada v4", viagens.get(0).getDescricao());
@@ -115,13 +120,13 @@ public class DbHelperMigrationTest {
             assertEquals("Serviço adicional", viagens.get(0).getServicos().get(0).getDescricao());
             assertEquals(18.5f, viagens.get(0).getServicos().get(0).getValor(), 0.01f);
 
-            ConfiguracaoDAO configDAO = new ConfiguracaoDAO(v7Helper);
+            ConfiguracaoDAO configDAO = new ConfiguracaoDAO(v8Helper);
             Configuracao configLoaded = configDAO.getConfiguracao();
             assertNotNull(configLoaded);
             assertEquals("Marcelo", configLoaded.getMotorista());
             assertEquals("Quartzolit", configLoaded.getClassificacaoViagemSeparada());
         } finally {
-            v7Helper.close();
+            v8Helper.close();
         }
     }
 
@@ -165,12 +170,12 @@ public class DbHelperMigrationTest {
         long idSemServico = v6Db.insertOrThrow(DbHelper.Viagem.NOME_TABELA, null, semServico);
         legacyV6.close();
 
-        DbHelper v7Helper = new DbHelper(context, dbName);
-        SQLiteDatabase v7Db = v7Helper.getWritableDatabase();
+        DbHelper v8Helper = new DbHelper(context, dbName);
+        SQLiteDatabase v8Db = v8Helper.getWritableDatabase();
         try {
-            assertEquals(7, v7Db.getVersion());
+            assertEquals(8, v8Db.getVersion());
 
-            ViagemDAO viagemDAO = new ViagemDAO(v7Helper);
+            ViagemDAO viagemDAO = new ViagemDAO(v8Helper);
             Viagem carregadaCom = viagemDAO.getViagemById(idComServico);
             assertNotNull(carregadaCom);
             assertEquals("Carlos Mendes", carregadaCom.getSolicitante());
@@ -183,19 +188,60 @@ public class DbHelperMigrationTest {
             assertTrue(carregadaSem.getServicos().isEmpty());
 
             // Simula re-execução idempotente da lógica de upgrade v7
-            v7Helper.onUpgrade(v7Db, 6, 7);
-            assertEquals(1, new ServicoDAO(v7Helper).getServicosPorViagem(idComServico).size());
+            v8Helper.onUpgrade(v8Db, 6, 8);
+            assertEquals(1, new ServicoDAO(v8Helper).getServicosPorViagem(idComServico).size());
         } finally {
-            v7Helper.close();
+            v8Helper.close();
         }
     }
 
     @Test
-    public void onCreateV7_criaIndicesForeignKeysEDeleteCascade() {
-        DbHelper v7Helper = new DbHelper(context, null);
-        SQLiteDatabase db = v7Helper.getWritableDatabase();
+    public void upgradeV7ParaV8_criaTabelaCustoEIndiceIdempotentemente() {
+        LegacyV7Helper legacyV7 = new LegacyV7Helper(context, dbName);
+        SQLiteDatabase v7Db = legacyV7.getWritableDatabase();
+        ContentValues viagem = new ContentValues();
+        viagem.put(DbHelper.Viagem.ORIGEM, "Itu");
+        viagem.put(DbHelper.Viagem.DATA, "2026-04-20");
+        viagem.put(DbHelper.Viagem.HORA, "10:00");
+        viagem.put(DbHelper.Viagem.DESTINO, "Sorocaba");
+        viagem.put(DbHelper.Viagem.DESCRICAO, "Corrida v7");
+        viagem.put(DbHelper.Viagem.KMS_RODADOS, 20f);
+        viagem.put(DbHelper.Viagem.VALOR_KM, 70f);
+        viagem.put(DbHelper.Viagem.VALOR_SERVICO, 0f);
+        viagem.put(DbHelper.Viagem.MOTORISTA, "Marcelo");
+        viagem.put(DbHelper.Viagem.HORA_ESPERA, 0f);
+        viagem.put(DbHelper.Viagem.VALOR_HORA_ESPERA, 0f);
+        viagem.put(DbHelper.Viagem.CLASSIFICACAO, "Comum");
+        viagem.put(DbHelper.Viagem.VALOR_TOTAL, 70f);
+        v7Db.insertOrThrow(DbHelper.Viagem.NOME_TABELA, null, viagem);
+        legacyV7.close();
+
+        DbHelper v8Helper = new DbHelper(context, dbName);
+        SQLiteDatabase v8Db = v8Helper.getWritableDatabase();
         try {
-            assertEquals(7, db.getVersion());
+            assertEquals(8, v8Db.getVersion());
+            Set<String> indicesCusto = listarIndices(v8Db, DbHelper.Custo.NOME_TABELA);
+            assertTrue(indicesCusto.contains("idx_custo_data_id"));
+
+            CustoDAO custoDAO = new CustoDAO(v8Helper);
+            long id = custoDAO.inserir(new Custo("Combustível", 120.0, "2026-04-20"));
+            assertTrue(id > 0L);
+
+            // Re-execução idempotente de v7->v8 preserva dados
+            v8Helper.onUpgrade(v8Db, 7, 8);
+            assertEquals(1, custoDAO.getAll().size());
+            assertEquals(1, new ViagemDAO(v8Helper).getAll().size());
+        } finally {
+            v8Helper.close();
+        }
+    }
+
+    @Test
+    public void onCreateV8_criaIndicesForeignKeysEDeleteCascade() {
+        DbHelper v8Helper = new DbHelper(context, null);
+        SQLiteDatabase db = v8Helper.getWritableDatabase();
+        try {
+            assertEquals(8, db.getVersion());
 
             Set<String> indicesViagem = listarIndices(db, DbHelper.Viagem.NOME_TABELA);
             assertTrue(indicesViagem.contains("idx_viagem_data_hora_id"));
@@ -204,13 +250,16 @@ public class DbHelperMigrationTest {
             Set<String> indicesServico = listarIndices(db, DbHelper.Servico.NOME_TABELA);
             assertTrue(indicesServico.contains("idx_servico_viagem_id"));
 
+            Set<String> indicesCusto = listarIndices(db, DbHelper.Custo.NOME_TABELA);
+            assertTrue(indicesCusto.contains("idx_custo_data_id"));
+
             try (Cursor fkCursor = db.rawQuery("PRAGMA foreign_keys", null)) {
                 assertTrue(fkCursor.moveToFirst());
                 assertEquals(1, fkCursor.getInt(0));
             }
 
-            ViagemDAO viagemDAO = new ViagemDAO(v7Helper);
-            ServicoDAO servicoDAO = new ServicoDAO(v7Helper);
+            ViagemDAO viagemDAO = new ViagemDAO(v8Helper);
+            ServicoDAO servicoDAO = new ServicoDAO(v8Helper);
 
             Viagem v = new Viagem(
                     0L, "Itu", "2026-05-01", "11:00", "Botucatu", "Viagem cascade",
@@ -227,7 +276,7 @@ public class DbHelperMigrationTest {
             assertEquals(1, viagemDAO.delete(id));
             assertTrue(servicoDAO.getServicosPorViagem(id).isEmpty());
         } finally {
-            v7Helper.close();
+            v8Helper.close();
         }
     }
 
@@ -286,6 +335,30 @@ public class DbHelperMigrationTest {
                     " (" + DbHelper.Viagem.DATA + " DESC, " + DbHelper.Viagem.HORA + " DESC, " + DbHelper.Viagem.ID + " DESC)");
             db.execSQL("CREATE INDEX IF NOT EXISTS idx_viagem_classif_data_hora_id ON " + DbHelper.Viagem.NOME_TABELA +
                     " (" + DbHelper.Viagem.CLASSIFICACAO + ", " + DbHelper.Viagem.DATA + " DESC, " + DbHelper.Viagem.HORA + " DESC, " + DbHelper.Viagem.ID + " DESC)");
+        }
+
+        @Override
+        public void onUpgrade(SQLiteDatabase db, int oldVersion, int newVersion) {
+            // Não usado neste teste
+        }
+    }
+
+    private static class LegacyV7Helper extends SQLiteOpenHelper {
+        LegacyV7Helper(Context context, String name) {
+            super(context, name, null, 7);
+        }
+
+        @Override
+        public void onCreate(SQLiteDatabase db) {
+            db.execSQL(DbHelper.Viagem.CRIAR_TABELA);
+            db.execSQL(DbHelper.Configuracao.CRIAR_TABELA);
+            db.execSQL(DbHelper.Servico.CRIAR_TABELA);
+            db.execSQL("CREATE INDEX IF NOT EXISTS idx_viagem_data_hora_id ON " + DbHelper.Viagem.NOME_TABELA +
+                    " (" + DbHelper.Viagem.DATA + " DESC, " + DbHelper.Viagem.HORA + " DESC, " + DbHelper.Viagem.ID + " DESC)");
+            db.execSQL("CREATE INDEX IF NOT EXISTS idx_viagem_classif_data_hora_id ON " + DbHelper.Viagem.NOME_TABELA +
+                    " (" + DbHelper.Viagem.CLASSIFICACAO + ", " + DbHelper.Viagem.DATA + " DESC, " + DbHelper.Viagem.HORA + " DESC, " + DbHelper.Viagem.ID + " DESC)");
+            db.execSQL("CREATE INDEX IF NOT EXISTS idx_servico_viagem_id ON " + DbHelper.Servico.NOME_TABELA +
+                    " (" + DbHelper.Servico.VIAGEM_ID + ")");
         }
 
         @Override

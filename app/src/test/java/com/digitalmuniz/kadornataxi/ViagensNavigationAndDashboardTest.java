@@ -1,25 +1,31 @@
 package com.digitalmuniz.kadornataxi;
 
+import android.app.Dialog;
 import android.content.Context;
 import android.content.Intent;
 import android.os.Looper;
 import android.view.View;
+import android.widget.EditText;
 import android.widget.TextView;
 
+import androidx.constraintlayout.widget.ConstraintLayout;
 import androidx.fragment.app.Fragment;
 import androidx.recyclerview.widget.RecyclerView;
 import androidx.test.core.app.ApplicationProvider;
 import androidx.test.ext.junit.runners.AndroidJUnit4;
 
 import com.digitalmuniz.kadornataxi.data.dao.ConfiguracaoDAO;
+import com.digitalmuniz.kadornataxi.data.dao.CustoDAO;
 import com.digitalmuniz.kadornataxi.data.dao.ViagemDAO;
 import com.digitalmuniz.kadornataxi.data.sqlite.DbHelper;
 import com.digitalmuniz.kadornataxi.model.entities.Configuracao;
+import com.digitalmuniz.kadornataxi.model.entities.Custo;
 import com.digitalmuniz.kadornataxi.model.entities.Servico;
 import com.digitalmuniz.kadornataxi.model.entities.Viagem;
 import com.digitalmuniz.kadornataxi.view.activities.ConfiguracaoActivity;
 import com.digitalmuniz.kadornataxi.view.activities.SolicitacaoActivity;
 import com.digitalmuniz.kadornataxi.view.activities.ViagensActivity;
+import com.digitalmuniz.kadornataxi.view.custom.EvolucaoFaturamentoChartView;
 import com.digitalmuniz.kadornataxi.view.fragments.DashboardFragment;
 import com.digitalmuniz.kadornataxi.view.fragments.ViagensFragment;
 import com.google.android.material.bottomnavigation.BottomNavigationView;
@@ -33,6 +39,7 @@ import org.junit.runner.RunWith;
 import org.robolectric.Robolectric;
 import org.robolectric.Shadows;
 import org.robolectric.android.controller.ActivityController;
+import org.robolectric.shadows.ShadowDialog;
 
 import java.util.Arrays;
 
@@ -46,13 +53,16 @@ public class ViagensNavigationAndDashboardTest {
 
     private Context context;
     private ViagemDAO viagemDAO;
+    private CustoDAO custoDAO;
     private ActivityController<ViagensActivity> activityController;
 
     @Before
     public void setUp() {
         context = ApplicationProvider.getApplicationContext();
         viagemDAO = new ViagemDAO(context);
+        custoDAO = new CustoDAO(context);
         viagemDAO.deleteAll();
+        custoDAO.deletarTodos();
     }
 
     @After
@@ -62,6 +72,7 @@ public class ViagensNavigationAndDashboardTest {
             activityController = null;
         }
         viagemDAO.deleteAll();
+        custoDAO.deletarTodos();
         DbHelper.getInstance(context).getWritableDatabase()
                 .delete(DbHelper.Configuracao.NOME_TABELA, null, null);
     }
@@ -73,8 +84,13 @@ public class ViagensNavigationAndDashboardTest {
         ViagensActivity activity = activityController.get();
 
         BottomNavigationView bottomNav = activity.findViewById(R.id.bottomNavigation);
-        FloatingActionButton fab = activity.findViewById(R.id.fabNovaViagem);
+        FloatingActionButton fabViagem = activity.findViewById(R.id.fabNovaViagem);
+        FloatingActionButton fabCusto = activity.findViewById(R.id.fabNovoCusto);
         TextView txtTitulo = activity.findViewById(R.id.txtTitulo);
+
+        ConstraintLayout.LayoutParams tituloParams = (ConstraintLayout.LayoutParams) txtTitulo.getLayoutParams();
+        assertEquals(0, tituloParams.width);
+        assertEquals(R.id.btConfig, tituloParams.endToStart);
 
         Fragment viagensFrag = activity.getSupportFragmentManager().findFragmentByTag("tab_viagens");
         Fragment dashFrag = activity.getSupportFragmentManager().findFragmentByTag("tab_dashboard");
@@ -83,7 +99,8 @@ public class ViagensNavigationAndDashboardTest {
         assertTrue(dashFrag instanceof DashboardFragment);
         assertFalse(viagensFrag.isHidden());
         assertTrue(dashFrag.isHidden());
-        assertEquals(View.VISIBLE, fab.getVisibility());
+        assertEquals(View.VISIBLE, fabViagem.getVisibility());
+        assertEquals(View.GONE, fabCusto.getVisibility());
         assertEquals("Minhas Viagens", txtTitulo.getText().toString());
 
         // Alterna para Dashboard
@@ -92,7 +109,8 @@ public class ViagensNavigationAndDashboardTest {
 
         assertTrue(viagensFrag.isHidden());
         assertFalse(dashFrag.isHidden());
-        assertEquals(View.GONE, fab.getVisibility());
+        assertEquals(View.GONE, fabViagem.getVisibility());
+        assertEquals(View.VISIBLE, fabCusto.getVisibility());
         assertEquals("Dashboard Financeiro", txtTitulo.getText().toString());
 
         // Alterna de volta para Viagens
@@ -101,7 +119,8 @@ public class ViagensNavigationAndDashboardTest {
 
         assertFalse(viagensFrag.isHidden());
         assertTrue(dashFrag.isHidden());
-        assertEquals(View.VISIBLE, fab.getVisibility());
+        assertEquals(View.VISIBLE, fabViagem.getVisibility());
+        assertEquals(View.GONE, fabCusto.getVisibility());
         assertEquals("Minhas Viagens", txtTitulo.getText().toString());
     }
 
@@ -205,6 +224,91 @@ public class ViagensNavigationAndDashboardTest {
         assertNotNull(nextIntent);
         assertNotNull(nextIntent.getComponent());
         assertEquals(ConfiguracaoActivity.class.getName(), nextIntent.getComponent().getClassName());
+    }
+
+    @Test
+    public void dashboardComCustos_renderizaHeroLucroCardCustosAlternaGraficoEModal() throws Exception {
+        inserirDadosExemplo();
+        custoDAO.inserir(new Custo("Combustível", 150.0, "2026-03-01"));
+
+        activityController = Robolectric.buildActivity(ViagensActivity.class).setup();
+        ViagensActivity activity = activityController.get();
+
+        BottomNavigationView bottomNav = activity.findViewById(R.id.bottomNavigation);
+        bottomNav.setSelectedItemId(R.id.nav_dashboard);
+        aguardarViewVisivel(activity.findViewById(R.id.dashboardContent));
+
+        TextView txtCustosHero = activity.findViewById(R.id.txtHeroCustosTotais);
+        TextView txtMargemHero = activity.findViewById(R.id.txtHeroMargemLiquida);
+        TextView txtLucroHero = activity.findViewById(R.id.txtLucroLiquido);
+        TextView txtCardCustosTotal = activity.findViewById(R.id.txtCardCustosTotal);
+        TextView txtCardCustosQtd = activity.findViewById(R.id.txtCardCustosQtd);
+        RecyclerView recyclerCustos = activity.findViewById(R.id.recyclerCustos);
+
+        assertEquals("R$ 150,00", txtCustosHero.getText().toString());
+        assertEquals("70,0%", txtMargemHero.getText().toString());
+        assertEquals("R$ 350,00", txtLucroHero.getText().toString());
+        assertEquals("R$ 150,00", txtCardCustosTotal.getText().toString());
+        assertEquals("1 registro", txtCardCustosQtd.getText().toString());
+        assertNotNull(recyclerCustos.getAdapter());
+        assertEquals(1, recyclerCustos.getAdapter().getItemCount());
+
+        // Alterna modo do gráfico para Lucro Líquido
+        EvolucaoFaturamentoChartView chart = activity.findViewById(R.id.evolucaoChart);
+        assertEquals(EvolucaoFaturamentoChartView.ModoExibicao.RECEITA_E_CUSTOS, chart.getModoExibicao());
+        activity.findViewById(R.id.chipGraficoLucro).performClick();
+        Shadows.shadowOf(Looper.getMainLooper()).idle();
+        assertEquals(EvolucaoFaturamentoChartView.ModoExibicao.LUCRO_LIQUIDO, chart.getModoExibicao());
+        assertEquals(View.GONE, activity.findViewById(R.id.layoutLegendaGrafico).getVisibility());
+
+        // Abre modal via fabNovoCusto e salva novo custo
+        activity.findViewById(R.id.fabNovoCusto).performClick();
+        Shadows.shadowOf(Looper.getMainLooper()).idle();
+
+        Dialog dialog = ShadowDialog.getLatestDialog();
+        assertNotNull(dialog);
+        assertTrue(dialog.isShowing());
+
+        ((EditText) dialog.findViewById(R.id.edDescricaoCusto)).setText("Pedágio");
+        ((EditText) dialog.findViewById(R.id.edValorCusto)).setText("5000");
+        ((EditText) dialog.findViewById(R.id.edDataCusto)).setText("02/03/2026");
+        dialog.findViewById(R.id.btnSalvarCusto).performClick();
+
+        aguardarTexto(txtCardCustosTotal, "R$ 200,00");
+        assertEquals("2 registros", txtCardCustosQtd.getText().toString());
+        assertEquals("R$ 300,00", txtLucroHero.getText().toString());
+        assertEquals(2, recyclerCustos.getAdapter().getItemCount());
+    }
+
+    @Test
+    public void dashboardApenasComCustos_naoExibeEmptyStateEMostraLucroNegativo() throws Exception {
+        custoDAO.inserir(new Custo("Manutenção", 300.0, "2026-03-05"));
+
+        activityController = Robolectric.buildActivity(ViagensActivity.class).setup();
+        ViagensActivity activity = activityController.get();
+
+        BottomNavigationView bottomNav = activity.findViewById(R.id.bottomNavigation);
+        bottomNav.setSelectedItemId(R.id.nav_dashboard);
+        aguardarViewVisivel(activity.findViewById(R.id.dashboardContent));
+
+        assertEquals(View.GONE, activity.findViewById(R.id.dashboardEmpty).getVisibility());
+        assertEquals("R$ 0,00", ((TextView) activity.findViewById(R.id.txtFaturamentoTotal)).getText().toString());
+        assertEquals("R$ 300,00", ((TextView) activity.findViewById(R.id.txtHeroCustosTotais)).getText().toString());
+        assertEquals("--", ((TextView) activity.findViewById(R.id.txtHeroMargemLiquida)).getText().toString());
+        assertEquals("-R$ 300,00", ((TextView) activity.findViewById(R.id.txtLucroLiquido)).getText().toString());
+    }
+
+    private void aguardarTexto(TextView view, String esperado) throws InterruptedException {
+        long limite = System.currentTimeMillis() + 3000L;
+        while (System.currentTimeMillis() < limite) {
+            Shadows.shadowOf(Looper.getMainLooper()).idle();
+            if (esperado.equals(view.getText().toString())) {
+                return;
+            }
+            Thread.sleep(20L);
+        }
+        Shadows.shadowOf(Looper.getMainLooper()).idle();
+        assertEquals(esperado, view.getText().toString());
     }
 
     private void inserirDadosExemplo() {

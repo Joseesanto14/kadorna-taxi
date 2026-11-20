@@ -1,5 +1,7 @@
 package com.digitalmuniz.kadornataxi.view.dto;
 
+import com.digitalmuniz.kadornataxi.model.entities.Custo;
+
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.List;
@@ -12,6 +14,7 @@ public class DashboardDadosDTO {
     private final DashboardResumoDTO resumo;
     private final List<FaturamentoMensalDTO> evolucaoAnual;
     private final List<ClassificacaoResumoDTO> rankingClientes;
+    private final List<Custo> custosDoPeriodo;
 
     public DashboardDadosDTO(
             List<String> anosDisponiveis,
@@ -21,6 +24,28 @@ public class DashboardDadosDTO {
             DashboardResumoDTO resumo,
             List<FaturamentoMensalDTO> evolucaoAnual,
             List<ClassificacaoResumoDTO> rankingClientes
+    ) {
+        this(
+                anosDisponiveis,
+                mesesDisponiveis,
+                anoSelecionado,
+                mesSelecionado,
+                resumo,
+                evolucaoAnual,
+                rankingClientes,
+                Collections.emptyList()
+        );
+    }
+
+    public DashboardDadosDTO(
+            List<String> anosDisponiveis,
+            List<String> mesesDisponiveis,
+            String anoSelecionado,
+            String mesSelecionado,
+            DashboardResumoDTO resumo,
+            List<FaturamentoMensalDTO> evolucaoAnual,
+            List<ClassificacaoResumoDTO> rankingClientes,
+            List<Custo> custosDoPeriodo
     ) {
         this.anosDisponiveis = anosDisponiveis != null
                 ? Collections.unmodifiableList(new ArrayList<>(anosDisponiveis))
@@ -36,6 +61,9 @@ public class DashboardDadosDTO {
                 : Collections.emptyList();
         this.rankingClientes = rankingClientes != null
                 ? Collections.unmodifiableList(new ArrayList<>(rankingClientes))
+                : Collections.emptyList();
+        this.custosDoPeriodo = custosDoPeriodo != null
+                ? Collections.unmodifiableList(new ArrayList<>(custosDoPeriodo))
                 : Collections.emptyList();
     }
 
@@ -65,5 +93,9 @@ public class DashboardDadosDTO {
 
     public List<ClassificacaoResumoDTO> getRankingClientes() {
         return rankingClientes;
+    }
+
+    public List<Custo> getCustosDoPeriodo() {
+        return custosDoPeriodo;
     }
 }

@@ -49,6 +49,24 @@ public class FormatadorDashboardTest {
     }
 
     @Test
+    public void abreviarParaGraficoComSinalEDataBR_formatamCorretamente() {
+        assertEquals("0", FormatadorDashboard.abreviarParaGraficoComSinal(0.0));
+        assertEquals("0", FormatadorDashboard.abreviarParaGraficoComSinal(-0.2));
+        assertEquals("850", FormatadorDashboard.abreviarParaGraficoComSinal(850.0));
+        assertEquals("-850", FormatadorDashboard.abreviarParaGraficoComSinal(-850.0));
+        assertEquals("-1,2k", FormatadorDashboard.abreviarParaGraficoComSinal(-1200.0));
+        assertEquals("1,5M", FormatadorDashboard.abreviarParaGraficoComSinal(1_500_000.0));
+
+        assertEquals("15/03/2026", FormatadorDashboard.formatarDataBR("2026-03-15"));
+        assertEquals("01/12/2025", FormatadorDashboard.formatarDataBR("01/12/2025"));
+        assertEquals("", FormatadorDashboard.formatarDataBR(null));
+
+        assertEquals("80,0%", FormatadorDashboard.formatarPercentualComSinal(80.0));
+        assertEquals("-25,5%", FormatadorDashboard.formatarPercentualComSinal(-25.5));
+        assertEquals("0,0%", FormatadorDashboard.formatarPercentualComSinal(-0.01));
+    }
+
+    @Test
     public void mesesPTBR_retornaSiglasENomesCorretos() {
         assertEquals("Jan", FormatadorDashboard.getSiglaMes("01"));
         assertEquals("Dez", FormatadorDashboard.getSiglaMes("12"));

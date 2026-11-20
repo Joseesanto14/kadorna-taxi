@@ -99,12 +99,11 @@ public final class ViagemDetalhesDialog {
         txtOrigem.setText(textoOuPadrao(viagem.getOrigem(), "-"));
         txtDestino.setText(textoOuPadrao(viagem.getDestino(), "-"));
 
-        TextView txtDescricao = dialog.findViewById(R.id.txtDetalheDescricao);
         LinearLayout layoutSolicitante = dialog.findViewById(R.id.layoutDetalheSolicitante);
         TextView txtSolicitante = dialog.findViewById(R.id.txtDetalheSolicitante);
+        TextView txtDescricao = dialog.findViewById(R.id.txtDetalheDescricao);
         TextView txtMotorista = dialog.findViewById(R.id.txtDetalheMotorista);
 
-        txtDescricao.setText(textoOuPadrao(viagem.getDescricao(), "-"));
         String solicitante = textoLimpo(viagem.getSolicitante());
         if (!solicitante.isEmpty()) {
             txtSolicitante.setText(solicitante);
@@ -112,6 +111,7 @@ public final class ViagemDetalhesDialog {
         } else {
             layoutSolicitante.setVisibility(View.GONE);
         }
+        txtDescricao.setText(textoOuPadrao(viagem.getDescricao(), "-"));
         txtMotorista.setText(textoOuPadrao(viagem.getMotorista(), "-"));
 
         TextView txtKmQtd = dialog.findViewById(R.id.txtDetalheKmQtd);

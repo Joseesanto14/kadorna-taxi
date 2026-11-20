@@ -9,6 +9,7 @@ import android.graphics.Paint
 import android.graphics.RectF
 import android.graphics.pdf.PdfDocument
 import android.os.Environment
+import android.text.Layout
 import android.text.StaticLayout
 import android.text.TextPaint
 import android.util.Log
@@ -17,6 +18,7 @@ import com.digitalmuniz.kadornataxi.model.entities.Configuracao
 import com.digitalmuniz.kadornataxi.model.entities.Viagem
 import com.digitalmuniz.kadornataxi.model.enums.ColunasPdf
 import com.digitalmuniz.kadornataxi.model.enums.Meses
+import com.digitalmuniz.kadornataxi.model.enums.ServicoItemPdf
 import java.io.File
 import java.io.FileOutputStream
 import java.io.IOException
@@ -48,6 +50,11 @@ class RelatorioPdfGenerator(
         private const val PADDING_CELULA_V = 4.5f
         private const val ALTURA_LINHA_PADRAO = 15f
         private const val ALTURA_BLOCO_TOTAIS = 96f
+
+        private const val PROPORCAO_SUBCOLUNA_SERVICO_DESC = 0.58f
+        private const val PADDING_DIVISORIA_INTERNA_SERVICO = 2.5f
+        private const val ESPACAMENTO_ENTRE_SERVICOS = 4.0f
+        private const val ESPACAMENTO_ANTES_TOTAL_SERVICO = 4.5f
 
         private const val FILE_NAME = "relatorio_viagens"
         private const val TAG = "RelatorioPdfGenerator"
@@ -102,8 +109,16 @@ class RelatorioPdfGenerator(
 
     private val painter = PdfPainter()
 
+    private data class ServicoItemMedido(
+        val item: ServicoItemPdf,
+        val layoutDescricao: StaticLayout,
+        val layoutValor: StaticLayout,
+        val alturaItem: Float
+    )
+
     private data class LinhaMedida(
         val layouts: List<StaticLayout>,
+        val itensServicos: List<ServicoItemMedido>,
         val altura: Float,
         val indiceGlobal: Int,
         val ehLinhaAlta: Boolean,
@@ -271,35 +286,41 @@ class RelatorioPdfGenerator(
         indiceGlobal: Int,
         alturaDisponivelPagina: Float
     ): List<LinhaMedida> {
-        val linhasServicos = ColunasPdf.formatarLinhasServicos(viagem)
-        if (linhasServicos.size <= 1) {
+        val itensOriginais = ColunasPdf.extrairItensServicos(viagem)
+        if (itensOriginais.size <= 1) {
             return listOf(criarLinhaMedida(viagem, indiceGlobal))
         }
+
+        val itensMedidos = itensOriginais.map { criarServicoItemMedido(it) }
+        val layoutsBasePrimeira = criarLayoutsBaseSubLinha(viagem, isPrimeira = true)
+        val layoutsBaseContinuacao = criarLayoutsBaseSubLinha(viagem, isPrimeira = false)
 
         val subLinhas = mutableListOf<LinhaMedida>()
         var inicio = 0
         var isPrimeira = true
 
-        while (inicio < linhasServicos.size) {
+        while (inicio < itensMedidos.size) {
+            val layoutsBase = if (isPrimeira) layoutsBasePrimeira else layoutsBaseContinuacao
             var melhorFim = inicio + 1
             var melhorLinha = criarSubLinhaMedida(
                 viagem = viagem,
                 indiceGlobal = indiceGlobal,
                 isPrimeira = isPrimeira,
-                textoServicos = linhasServicos[inicio]
+                layoutsBase = layoutsBase,
+                itensSubLista = itensMedidos.subList(inicio, melhorFim)
             )
 
             // Busca binária do maior prefixo de serviços que cabe em uma página
             var low = inicio + 2
-            var high = linhasServicos.size
+            var high = itensMedidos.size
             while (low <= high) {
                 val mid = (low + high) / 2
-                val candidatoTexto = linhasServicos.subList(inicio, mid).joinToString("\n")
                 val candidato = criarSubLinhaMedida(
                     viagem = viagem,
                     indiceGlobal = indiceGlobal,
                     isPrimeira = isPrimeira,
-                    textoServicos = candidatoTexto
+                    layoutsBase = layoutsBase,
+                    itensSubLista = itensMedidos.subList(inicio, mid)
                 )
                 if (candidato.altura <= alturaDisponivelPagina) {
                     melhorFim = mid
@@ -406,16 +427,20 @@ class RelatorioPdfGenerator(
         var x = MARGEM_HORIZONTAL
         linha.layouts.forEachIndexed { index, layout ->
             val coluna = ColunasPdf.entries[index]
-            val offsetVertical = if (linha.ehLinhaAlta) {
-                PADDING_CELULA_V
+            if (coluna == ColunasPdf.SERVICOS && linha.itensServicos.isNotEmpty()) {
+                desenharCelulaServicosDividida(canvas, x, yTopo, yBase, coluna.larguraPt, linha)
             } else {
-                (linha.altura - layout.height) / 2f
-            }
+                val offsetVertical = if (linha.ehLinhaAlta) {
+                    PADDING_CELULA_V
+                } else {
+                    (linha.altura - layout.height) / 2f
+                }
 
-            canvas.save()
-            canvas.translate(x + PADDING_CELULA_H, yTopo + offsetVertical)
-            layout.draw(canvas)
-            canvas.restore()
+                canvas.save()
+                canvas.translate(x + PADDING_CELULA_H, yTopo + offsetVertical)
+                layout.draw(canvas)
+                canvas.restore()
+            }
 
             x += coluna.larguraPt
             // Linha divisória vertical interna sutil
@@ -428,6 +453,59 @@ class RelatorioPdfGenerator(
         canvas.drawLine(MARGEM_HORIZONTAL, yTopo, MARGEM_HORIZONTAL, yBase, painter.horizontalGridPaint)
         canvas.drawLine(MARGEM_HORIZONTAL + larguraTabela, yTopo, MARGEM_HORIZONTAL + larguraTabela, yBase, painter.horizontalGridPaint)
         canvas.drawLine(MARGEM_HORIZONTAL, yBase, MARGEM_HORIZONTAL + larguraTabela, yBase, painter.horizontalGridPaint)
+    }
+
+    private fun desenharCelulaServicosDividida(
+        canvas: Canvas,
+        xInicio: Float,
+        yTopo: Float,
+        yBase: Float,
+        larguraColuna: Float,
+        linha: LinhaMedida
+    ) {
+        val larguraSubColunaEsquerda = larguraColuna * PROPORCAO_SUBCOLUNA_SERVICO_DESC
+        val xDivisoria = xInicio + larguraSubColunaEsquerda
+        canvas.drawLine(xDivisoria, yTopo, xDivisoria, yBase, painter.verticalGridPaint)
+
+        val alturaServicos = calcularAlturaItensServicos(linha.itensServicos)
+        var yItem = yTopo + if (linha.ehLinhaAlta) {
+            PADDING_CELULA_V
+        } else {
+            (linha.altura - alturaServicos) / 2f
+        }
+
+        val xDesc = xInicio + PADDING_CELULA_H
+        val xValor = xDivisoria + PADDING_DIVISORIA_INTERNA_SERVICO
+
+        linha.itensServicos.forEachIndexed { index, servicoMedido ->
+            if (index > 0) {
+                val espaco = if (servicoMedido.item.ehTotal) {
+                    ESPACAMENTO_ANTES_TOTAL_SERVICO
+                } else {
+                    ESPACAMENTO_ENTRE_SERVICOS
+                }
+                val yDivisoria = yItem + (espaco / 2f)
+                val paintDivisoria = if (servicoMedido.item.ehTotal) {
+                    painter.horizontalGridPaint
+                } else {
+                    painter.verticalGridPaint
+                }
+                canvas.drawLine(xInicio, yDivisoria, xInicio + larguraColuna, yDivisoria, paintDivisoria)
+                yItem += espaco
+            }
+
+            canvas.save()
+            canvas.translate(xDesc, yItem)
+            servicoMedido.layoutDescricao.draw(canvas)
+            canvas.restore()
+
+            canvas.save()
+            canvas.translate(xValor, yItem)
+            servicoMedido.layoutValor.draw(canvas)
+            canvas.restore()
+
+            yItem += servicoMedido.alturaItem
+        }
     }
 
     private fun desenharTotais(canvas: Canvas, yInicial: Float) {
@@ -497,29 +575,97 @@ class RelatorioPdfGenerator(
     private fun criarLinhaMedida(viagem: Viagem, indiceGlobal: Int): LinhaMedida {
         val textoDescricao = ColunasPdf.DESCRICAO.extrairDado(viagem)
         val textoServicos = ColunasPdf.SERVICOS.extrairDado(viagem)
+        val itensServicos = ColunasPdf.extrairItensServicos(viagem).map { criarServicoItemMedido(it) }
         val layouts = ColunasPdf.entries.map { coluna ->
-            criarLayoutCelula(coluna, coluna.extrairDado(viagem))
+            val texto = if (coluna == ColunasPdf.SERVICOS && itensServicos.isNotEmpty()) {
+                ""
+            } else {
+                coluna.extrairDado(viagem)
+            }
+            criarLayoutCelula(coluna, texto)
         }
-        return construirLinhaMedida(layouts, indiceGlobal, textoDescricao, textoServicos)
+        return construirLinhaMedida(layouts, itensServicos, indiceGlobal, textoDescricao, textoServicos)
     }
 
-    private fun criarSubLinhaMedida(
-        viagem: Viagem,
-        indiceGlobal: Int,
-        isPrimeira: Boolean,
-        textoServicos: String
-    ): LinhaMedida {
-        val textoDescricao = if (isPrimeira) ColunasPdf.DESCRICAO.extrairDado(viagem) else "Continuação"
-        val layouts = ColunasPdf.entries.map { coluna ->
+    private fun criarLayoutsBaseSubLinha(viagem: Viagem, isPrimeira: Boolean): List<StaticLayout> {
+        return ColunasPdf.entries.map { coluna ->
             val texto = when {
-                coluna == ColunasPdf.SERVICOS -> textoServicos
+                coluna == ColunasPdf.SERVICOS -> ""
                 isPrimeira -> coluna.extrairDado(viagem)
                 coluna == ColunasPdf.DESCRICAO -> "Continuação"
                 else -> ""
             }
             criarLayoutCelula(coluna, texto)
         }
-        return construirLinhaMedida(layouts, indiceGlobal, textoDescricao, textoServicos)
+    }
+
+    private fun criarSubLinhaMedida(
+        viagem: Viagem,
+        indiceGlobal: Int,
+        isPrimeira: Boolean,
+        layoutsBase: List<StaticLayout>,
+        itensSubLista: List<ServicoItemMedido>
+    ): LinhaMedida {
+        val textoDescricao = if (isPrimeira) ColunasPdf.DESCRICAO.extrairDado(viagem) else "Continuação"
+        val textoServicos = itensSubLista.joinToString("\n") { it.item.formatarTexto() }
+        return construirLinhaMedida(layoutsBase, itensSubLista, indiceGlobal, textoDescricao, textoServicos)
+    }
+
+    private fun criarServicoItemMedido(item: ServicoItemPdf): ServicoItemMedido {
+        val larguraColuna = ColunasPdf.SERVICOS.larguraPt
+        val larguraSubColunaEsquerda = larguraColuna * PROPORCAO_SUBCOLUNA_SERVICO_DESC
+        val larguraSubColunaDireita = larguraColuna - larguraSubColunaEsquerda
+
+        val larguraDesc = (larguraSubColunaEsquerda - PADDING_CELULA_H - PADDING_DIVISORIA_INTERNA_SERVICO)
+            .toInt()
+            .coerceAtLeast(10)
+        val larguraValor = (larguraSubColunaDireita - PADDING_DIVISORIA_INTERNA_SERVICO - PADDING_CELULA_H)
+            .toInt()
+            .coerceAtLeast(10)
+
+        val paintDesc = if (item.ehTotal) painter.serviceTotalDescTextPaint else painter.bodyTextPaint
+        val paintValor = if (item.ehTotal) painter.serviceValueBoldTextPaint else painter.serviceValueTextPaint
+
+        val layoutDescricao = StaticLayout.Builder.obtain(
+            item.descricao,
+            0,
+            item.descricao.length,
+            paintDesc,
+            larguraDesc
+        )
+            .setAlignment(Layout.Alignment.ALIGN_NORMAL)
+            .setIncludePad(false)
+            .build()
+
+        val layoutValor = StaticLayout.Builder.obtain(
+            item.valorFormatado,
+            0,
+            item.valorFormatado.length,
+            paintValor,
+            larguraValor
+        )
+            .setAlignment(Layout.Alignment.ALIGN_OPPOSITE)
+            .setIncludePad(false)
+            .build()
+
+        val alturaItem = maxOf(layoutDescricao.height, layoutValor.height).toFloat()
+        return ServicoItemMedido(item, layoutDescricao, layoutValor, alturaItem)
+    }
+
+    private fun calcularAlturaItensServicos(itensServicos: List<ServicoItemMedido>): Float {
+        if (itensServicos.isEmpty()) return 0f
+        var altura = 0f
+        itensServicos.forEachIndexed { index, medido ->
+            if (index > 0) {
+                altura += if (medido.item.ehTotal) {
+                    ESPACAMENTO_ANTES_TOTAL_SERVICO
+                } else {
+                    ESPACAMENTO_ENTRE_SERVICOS
+                }
+            }
+            altura += medido.alturaItem
+        }
+        return altura
     }
 
     private fun criarLayoutCelula(coluna: ColunasPdf, texto: String): StaticLayout {
@@ -538,14 +684,23 @@ class RelatorioPdfGenerator(
 
     private fun construirLinhaMedida(
         layouts: List<StaticLayout>,
+        itensServicos: List<ServicoItemMedido>,
         indiceGlobal: Int,
         textoDescricao: String,
         textoServicos: String
     ): LinhaMedida {
-        val alturaTexto = layouts.maxOf { it.height }.toFloat()
-        val ehLinhaAlta = layouts.any { it.lineCount > 1 }
+        val alturaOutrosLayouts = layouts
+            .filterIndexed { index, _ -> ColunasPdf.entries[index] != ColunasPdf.SERVICOS || itensServicos.isEmpty() }
+            .maxOf { it.height }
+            .toFloat()
+        val alturaServicos = calcularAlturaItensServicos(itensServicos)
+        val alturaTexto = maxOf(alturaOutrosLayouts, alturaServicos)
+        val ehLinhaAlta = layouts.any { it.lineCount > 1 } ||
+            itensServicos.size > 1 ||
+            itensServicos.any { it.layoutDescricao.lineCount > 1 || it.layoutValor.lineCount > 1 }
         return LinhaMedida(
             layouts = layouts,
+            itensServicos = itensServicos,
             altura = alturaTexto + (PADDING_CELULA_V * 2f),
             indiceGlobal = indiceGlobal,
             ehLinhaAlta = ehLinhaAlta,
@@ -658,6 +813,29 @@ class RelatorioPdfGenerator(
             color = Color.parseColor("#212121")
             textAlign = Paint.Align.LEFT
             textSize = 8.5f
+            isAntiAlias = true
+        }
+
+        val serviceTotalDescTextPaint = TextPaint().apply {
+            color = Color.parseColor("#212121")
+            textAlign = Paint.Align.LEFT
+            textSize = 8.5f
+            isFakeBoldText = true
+            isAntiAlias = true
+        }
+
+        val serviceValueTextPaint = TextPaint().apply {
+            color = Color.parseColor("#212121")
+            textAlign = Paint.Align.LEFT
+            textSize = 8.0f
+            isAntiAlias = true
+        }
+
+        val serviceValueBoldTextPaint = TextPaint().apply {
+            color = Color.parseColor("#212121")
+            textAlign = Paint.Align.LEFT
+            textSize = 8.0f
+            isFakeBoldText = true
             isAntiAlias = true
         }
 

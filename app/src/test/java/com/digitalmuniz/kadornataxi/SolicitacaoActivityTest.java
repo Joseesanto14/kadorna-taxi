@@ -1,6 +1,8 @@
 package com.digitalmuniz.kadornataxi;
 
+import android.app.DatePickerDialog;
 import android.content.Context;
+import android.content.DialogInterface;
 import android.content.Intent;
 import android.os.Looper;
 import android.view.View;
@@ -8,6 +10,7 @@ import android.view.ViewGroup;
 import android.widget.EditText;
 import android.widget.ImageButton;
 import android.widget.LinearLayout;
+import android.widget.TextView;
 
 import androidx.test.core.app.ApplicationProvider;
 import androidx.test.ext.junit.runners.AndroidJUnit4;
@@ -27,6 +30,7 @@ import org.junit.runner.RunWith;
 import org.robolectric.Robolectric;
 import org.robolectric.Shadows;
 import org.robolectric.android.controller.ActivityController;
+import org.robolectric.shadows.ShadowDialog;
 
 import java.util.ArrayList;
 import java.util.Arrays;
@@ -88,6 +92,38 @@ public class SolicitacaoActivityTest {
 
         LinearLayout containerServicos = activity.findViewById(R.id.containerServicos);
         assertEquals(1, containerServicos.getChildCount());
+
+        View linha1 = containerServicos.getChildAt(0);
+        EditText edDesc1 = linha1.findViewById(R.id.edServicoDescricao);
+        EditText edVal1 = linha1.findViewById(R.id.edServicoValor);
+        assertEquals(R.drawable.campo, Shadows.shadowOf(edDesc1.getBackground()).getCreatedFromResId());
+        assertEquals(R.drawable.campo, Shadows.shadowOf(edVal1.getBackground()).getCreatedFromResId());
+
+        TextView titulo = activity.findViewById(R.id.SolicitaçãodeTaxi);
+        assertEquals(1, titulo.getMaxLines());
+        assertEquals(TextView.AUTO_SIZE_TEXT_TYPE_UNIFORM, titulo.getAutoSizeTextType());
+
+        List<String> rotulosDuasColunas = Arrays.asList(
+                "Data",
+                "Hora",
+                "Km Rodados",
+                "Valor da Viagem (R$)",
+                "Hora Espera",
+                "Valor Espera (R$)",
+                "Serviço prestado para:",
+                "Valor Total (R$)"
+        );
+        List<TextView> labelsEncontrados = new ArrayList<>();
+        coletarLabelsPorTexto(scrollContent, rotulosDuasColunas, labelsEncontrados);
+        assertEquals(rotulosDuasColunas.size(), labelsEncontrados.size());
+        for (TextView label : labelsEncontrados) {
+            assertEquals("Label '" + label.getText() + "' deve ter maxLines == 1", 1, label.getMaxLines());
+            assertEquals(
+                    "Label '" + label.getText() + "' deve usar autoSizeTextType uniform",
+                    TextView.AUTO_SIZE_TEXT_TYPE_UNIFORM,
+                    label.getAutoSizeTextType()
+            );
+        }
     }
 
     @Test
@@ -211,6 +247,33 @@ public class SolicitacaoActivityTest {
         assertNotNull(activityLegado.findViewById(R.id.btGerarViagem));
     }
 
+    @Test
+    public void clicarBotaoCalendario_abreDatePickerEPreenchaDataFormatada() {
+        controller = Robolectric.buildActivity(SolicitacaoActivity.class).setup();
+        SolicitacaoActivity activity = controller.get();
+
+        EditText edData = activity.findViewById(R.id.edData);
+        ImageButton btnCalendario = activity.findViewById(R.id.btnSelecionarDataViagem);
+        assertNotNull(btnCalendario);
+
+        edData.setText("05012026");
+        btnCalendario.performClick();
+        Shadows.shadowOf(Looper.getMainLooper()).idle();
+
+        android.app.Dialog dialog = ShadowDialog.getLatestDialog();
+        assertTrue(dialog instanceof DatePickerDialog);
+        DatePickerDialog picker = (DatePickerDialog) dialog;
+        assertEquals(2026, picker.getDatePicker().getYear());
+        assertEquals(0, picker.getDatePicker().getMonth());
+        assertEquals(5, picker.getDatePicker().getDayOfMonth());
+
+        picker.updateDate(2026, 10, 25);
+        picker.getButton(DialogInterface.BUTTON_POSITIVE).performClick();
+        Shadows.shadowOf(Looper.getMainLooper()).idle();
+
+        assertEquals("25/11/2026", edData.getText().toString());
+    }
+
     private void coletarIds(View view, List<Integer> ids) {
         if (view.getId() != View.NO_ID) {
             ids.add(view.getId());
@@ -219,6 +282,22 @@ public class SolicitacaoActivityTest {
             ViewGroup vg = (ViewGroup) view;
             for (int i = 0; i < vg.getChildCount(); i++) {
                 coletarIds(vg.getChildAt(i), ids);
+            }
+        }
+    }
+
+    private void coletarLabelsPorTexto(View view, List<String> alvos, List<TextView> encontrados) {
+        if (view instanceof TextView && !(view instanceof EditText) && !(view instanceof android.widget.Button)) {
+            TextView tv = (TextView) view;
+            String texto = tv.getText() != null ? tv.getText().toString() : "";
+            if (alvos.contains(texto)) {
+                encontrados.add(tv);
+            }
+        }
+        if (view instanceof ViewGroup) {
+            ViewGroup vg = (ViewGroup) view;
+            for (int i = 0; i < vg.getChildCount(); i++) {
+                coletarLabelsPorTexto(vg.getChildAt(i), alvos, encontrados);
             }
         }
     }

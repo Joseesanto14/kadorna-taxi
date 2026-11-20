@@ -1,6 +1,7 @@
 package com.digitalmuniz.kadornataxi.view.activities;
 
 import android.annotation.SuppressLint;
+import android.app.DatePickerDialog;
 import android.os.Bundle;
 import android.text.Editable;
 import android.text.TextWatcher;
@@ -28,6 +29,9 @@ import com.digitalmuniz.kadornataxi.model.entities.Viagem;
 import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.time.LocalTime;
+import java.time.format.DateTimeFormatter;
+import java.time.format.DateTimeParseException;
+import java.time.format.ResolverStyle;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Locale;
@@ -36,11 +40,16 @@ import java.util.Locale;
 public class SolicitacaoActivity extends AppCompatActivity {
 
     public static final String EXTRA_VIAGEM = "extra_viagem";
+    private static final DateTimeFormatter DATA_INPUT_FORMATTER = DateTimeFormatter
+            .ofPattern("dd/MM/uuuu", Locale.getDefault())
+            .withResolverStyle(ResolverStyle.STRICT);
+    private static final DateTimeFormatter DATA_DIGITOS_FORMATTER =
+            DateTimeFormatter.ofPattern("ddMMyyyy", Locale.getDefault());
 
     EditText edOrigem, edData, edHora, edDestino, edDescricao, edSolicitante, edKmsRodados, edMotorista, edHoraEspera, edCliente;
     EditText edValorKm, edValorHoraEspera, edValorTotal;
     LinearLayout containerServicos;
-    ImageButton btnAdicionarServico;
+    ImageButton btnAdicionarServico, btnSelecionarDataViagem;
     AppCompatButton btGerarViagem;
 
     private long viagemEditandoId = -1;
@@ -91,6 +100,7 @@ public class SolicitacaoActivity extends AppCompatActivity {
         edValorTotal = findViewById(R.id.edValorTotal);
         containerServicos = findViewById(R.id.containerServicos);
         btnAdicionarServico = findViewById(R.id.btnAdicionarServico);
+        btnSelecionarDataViagem = findViewById(R.id.btnSelecionarDataViagem);
         btGerarViagem = findViewById(R.id.btGerarViagem);
     }
 
@@ -151,6 +161,7 @@ public class SolicitacaoActivity extends AppCompatActivity {
         EditText edServicoValor = linha.findViewById(R.id.edServicoValor);
         ImageButton btnRemoverServico = linha.findViewById(R.id.btnRemoverServico);
 
+        edServicoDescricao.setNextFocusDownId(edServicoValor.getId());
         aplicarMascaraCentavos(edServicoValor);
 
         if (descricao != null && !descricao.isEmpty()) {
@@ -338,6 +349,35 @@ public class SolicitacaoActivity extends AppCompatActivity {
         listenerKmsRodados();
         listenerHoraEspera();
         btnAdicionarServico.setOnClickListener(v -> adicionarLinhaServico("", 0f, true));
+        btnSelecionarDataViagem.setOnClickListener(v -> abrirSeletorData());
+    }
+
+    private void abrirSeletorData() {
+        LocalDate dataInicial = resolverDataAtualCampo();
+        DatePickerDialog picker = new DatePickerDialog(
+                this,
+                (view, year, month, dayOfMonth) -> {
+                    LocalDate selecionada = LocalDate.of(year, month + 1, dayOfMonth);
+                    edData.setText(selecionada.format(DATA_DIGITOS_FORMATTER));
+                    edData.setError(null);
+                },
+                dataInicial.getYear(),
+                dataInicial.getMonthValue() - 1,
+                dataInicial.getDayOfMonth()
+        );
+        picker.show();
+    }
+
+    private LocalDate resolverDataAtualCampo() {
+        String texto = edData.getText() != null ? edData.getText().toString().trim() : "";
+        if (!texto.isEmpty()) {
+            try {
+                return LocalDate.parse(texto, DATA_INPUT_FORMATTER);
+            } catch (DateTimeParseException ignored) {
+                // Usa data atual quando o texto digitado ainda não representa data válida.
+            }
+        }
+        return LocalDate.now();
     }
 
     private void listenerData() {

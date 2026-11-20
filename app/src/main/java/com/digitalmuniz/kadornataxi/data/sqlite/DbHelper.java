@@ -7,7 +7,7 @@ import android.database.sqlite.SQLiteOpenHelper;
 
 public class DbHelper extends SQLiteOpenHelper {
     public static final String DATABASE_NAME = "kadorna_taxi.db";
-    public static final int DATABASE_VERSION = 7;
+    public static final int DATABASE_VERSION = 8;
 
     private static volatile DbHelper instance;
 
@@ -42,6 +42,7 @@ public class DbHelper extends SQLiteOpenHelper {
         db.execSQL(Viagem.CRIAR_TABELA);
         db.execSQL(Configuracao.CRIAR_TABELA);
         db.execSQL(Servico.CRIAR_TABELA);
+        db.execSQL(Custo.CRIAR_TABELA);
         criarIndices(db);
     }
 
@@ -68,7 +69,8 @@ public class DbHelper extends SQLiteOpenHelper {
         }
         if (oldVersion < 7) {
             db.execSQL(Servico.CRIAR_TABELA);
-            criarIndices(db);
+            criarIndicesViagem(db);
+            criarIndicesServico(db);
             db.execSQL(
                     "INSERT INTO " + Servico.NOME_TABELA + " (" + Servico.VIAGEM_ID + ", " + Servico.DESCRICAO + ", " + Servico.VALOR + ") " +
                     "SELECT " + Viagem.ID + ", 'Serviço adicional', " + Viagem.VALOR_SERVICO + " " +
@@ -76,6 +78,10 @@ public class DbHelper extends SQLiteOpenHelper {
                     "WHERE COALESCE(" + Viagem.VALOR_SERVICO + ", 0) > 0 " +
                     "AND NOT EXISTS (SELECT 1 FROM " + Servico.NOME_TABELA + " s WHERE s." + Servico.VIAGEM_ID + " = " + Viagem.NOME_TABELA + "." + Viagem.ID + ")"
             );
+        }
+        if (oldVersion < 8) {
+            db.execSQL(Custo.CRIAR_TABELA);
+            criarIndicesCusto(db);
         }
     }
 
@@ -103,6 +109,7 @@ public class DbHelper extends SQLiteOpenHelper {
     private void criarIndices(SQLiteDatabase db) {
         criarIndicesViagem(db);
         criarIndicesServico(db);
+        criarIndicesCusto(db);
     }
 
     private void criarIndicesViagem(SQLiteDatabase db) {
@@ -115,6 +122,11 @@ public class DbHelper extends SQLiteOpenHelper {
     private void criarIndicesServico(SQLiteDatabase db) {
         db.execSQL("CREATE INDEX IF NOT EXISTS idx_servico_viagem_id ON " + Servico.NOME_TABELA +
                 " (" + Servico.VIAGEM_ID + ")");
+    }
+
+    private void criarIndicesCusto(SQLiteDatabase db) {
+        db.execSQL("CREATE INDEX IF NOT EXISTS idx_custo_data_id ON " + Custo.NOME_TABELA +
+                " (" + Custo.DATA + " DESC, " + Custo.ID + " DESC)");
     }
 
     // ---------- Tabela Viagem ----------
@@ -200,6 +212,23 @@ public class DbHelper extends SQLiteOpenHelper {
                 DESCRICAO + " TEXT NOT NULL, " +
                 VALOR + " REAL NOT NULL DEFAULT 0, " +
                 "FOREIGN KEY(" + VIAGEM_ID + ") REFERENCES " + Viagem.NOME_TABELA + "(" + Viagem.ID + ") ON DELETE CASCADE" +
+                ");";
+    }
+
+    // ---------- Tabela Custo ----------
+
+    public static class Custo {
+        public static final String NOME_TABELA = "custo";
+        public static final String ID = "id_custo";
+        public static final String DESCRICAO = "descricao";
+        public static final String VALOR = "valor";
+        public static final String DATA = "data";
+
+        public static final String CRIAR_TABELA = "CREATE TABLE IF NOT EXISTS " + NOME_TABELA + " (" +
+                ID + " INTEGER PRIMARY KEY AUTOINCREMENT, " +
+                DESCRICAO + " TEXT NOT NULL, " +
+                VALOR + " REAL NOT NULL DEFAULT 0, " +
+                DATA + " TEXT NOT NULL" +
                 ");";
     }
 }

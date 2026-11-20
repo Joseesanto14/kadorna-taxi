@@ -38,6 +38,52 @@
     <string name="cd_evolucao_chart">Gráfico de evolução mensal do faturamento</string>
     <string name="cd_delta_icon">Indicador de variação</string>
     <string name="cd_classificacao_icon">Tipo de cliente</string>
+    <string name="cd_novo_custo">Novo custo</string>
+    <string name="cd_custo_icon">Ícone de custo</string>
+    <string name="cd_editar_custo">Editar custo</string>
+    <string name="cd_excluir_custo">Excluir custo</string>
+    <string name="cd_selecionar_data_custo">Selecionar data do custo</string>
+
+    <!-- Custos e Lucro Líquido no Dashboard -->
+    <string name="dashboard_faturamento_bruto_subtitulo">Faturamento bruto</string>
+    <string name="dashboard_custos_totais_label">Custos Totais</string>
+    <string name="dashboard_margem_liquida_label">Margem Líquida</string>
+    <string name="dashboard_lucro_liquido_label">Lucro Líquido</string>
+    <string name="dashboard_grafico_modo_receita_custos">Receita x Custos</string>
+    <string name="dashboard_grafico_modo_lucro">Lucro Líquido</string>
+    <string name="dashboard_legenda_receita">Receita</string>
+    <string name="dashboard_legenda_custos">Custos</string>
+    <string name="dashboard_custos_card_titulo">Custos do Período</string>
+    <string name="dashboard_custos_adicionar">Adicionar</string>
+    <string name="dashboard_custos_vazio">Nenhum custo registrado neste período.</string>
+    <string name="dashboard_custos_sobre_receita">Custos representam %s da receita</string>
+    <string name="dashboard_custos_sem_receita">Sem receita no período para calcular percentual</string>
+    <string name="dashboard_cta_registrar_custo">Registrar Custo</string>
+
+    <!-- Modal de Custo -->
+    <string name="custo_modal_titulo_novo">Novo Custo</string>
+    <string name="custo_modal_titulo_editar">Editar Custo</string>
+    <string name="custo_label_descricao">Descrição</string>
+    <string name="custo_hint_descricao">Ex: Combustível, Manutenção, Pedágio</string>
+    <string name="custo_label_valor">Valor (R$)</string>
+    <string name="custo_hint_valor">0,00</string>
+    <string name="custo_label_data">Data</string>
+    <string name="custo_hint_data">dd/MM/aaaa</string>
+    <string name="custo_chip_combustivel">Combustível</string>
+    <string name="custo_chip_manutencao">Manutenção</string>
+    <string name="custo_chip_pedagio">Pedágio</string>
+    <string name="custo_chip_lavagem">Lavagem</string>
+    <string name="custo_chip_seguro">Seguro</string>
+    <string name="custo_btn_salvar">Salvar</string>
+    <string name="custo_btn_cancelar">Cancelar</string>
+    <string name="custo_erro_descricao">Informe a descrição do custo.</string>
+    <string name="custo_erro_valor">Informe um valor maior que zero.</string>
+    <string name="custo_erro_data">Informe uma data válida (dd/MM/aaaa).</string>
+    <string name="custo_excluir_titulo">Excluir Custo</string>
+    <string name="custo_excluir_mensagem">Deseja realmente excluir o custo \"%1$s\" (%2$s)?</string>
+    <string name="custo_excluir_confirmar">Excluir</string>
+    <string name="custo_salvo_sucesso">Custo salvo com sucesso.</string>
+    <string name="custo_excluido_sucesso">Custo excluído com sucesso.</string>
 
     <!-- Detalhes da Viagem -->
     <string name="detalhes_viagem_titulo">Detalhes da Viagem</string>

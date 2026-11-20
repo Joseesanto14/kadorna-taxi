@@ -205,26 +205,11 @@
                     android:layout_marginTop="8dp"
                     android:orientation="vertical">
 
-                    <TextView
-                        android:layout_width="wrap_content"
-                        android:layout_height="wrap_content"
-                        android:text="@string/detalhes_label_descricao"
-                        android:textColor="@color/text_secondary"
-                        android:textSize="12sp" />
-
-                    <TextView
-                        android:id="@+id/txtDetalheDescricao"
-                        android:layout_width="match_parent"
-                        android:layout_height="wrap_content"
-                        android:layout_marginTop="2dp"
-                        android:textColor="@color/text_primary"
-                        android:textSize="14sp" />
-
                     <LinearLayout
                         android:id="@+id/layoutDetalheSolicitante"
                         android:layout_width="match_parent"
                         android:layout_height="wrap_content"
-                        android:layout_marginTop="10dp"
+                        android:layout_marginBottom="10dp"
                         android:orientation="vertical"
                         android:visibility="gone">
 
@@ -243,6 +228,21 @@
                             android:textColor="@color/text_primary"
                             android:textSize="14sp" />
                     </LinearLayout>
+
+                    <TextView
+                        android:layout_width="wrap_content"
+                        android:layout_height="wrap_content"
+                        android:text="@string/detalhes_label_descricao"
+                        android:textColor="@color/text_secondary"
+                        android:textSize="12sp" />
+
+                    <TextView
+                        android:id="@+id/txtDetalheDescricao"
+                        android:layout_width="match_parent"
+                        android:layout_height="wrap_content"
+                        android:layout_marginTop="2dp"
+                        android:textColor="@color/text_primary"
+                        android:textSize="14sp" />
 
                     <TextView
                         android:layout_width="wrap_content"

@@ -3,11 +3,17 @@ package com.digitalmuniz.kadornataxi.util;
 import java.math.RoundingMode;
 import java.text.DecimalFormat;
 import java.text.DecimalFormatSymbols;
+import java.time.LocalDate;
+import java.time.format.DateTimeFormatter;
+import java.time.format.DateTimeParseException;
+import java.time.format.ResolverStyle;
 import java.util.Locale;
 
 public final class FormatadorDashboard {
 
     private static final Locale PT_BR = new Locale("pt", "BR");
+    private static final DateTimeFormatter FORMATTER_BR_STRICT =
+            DateTimeFormatter.ofPattern("dd/MM/uuuu").withResolverStyle(ResolverStyle.STRICT);
 
     private static final String[] NOMES_MESES = {
             "Janeiro", "Fevereiro", "Março", "Abril", "Maio", "Junho",
@@ -78,6 +84,18 @@ public final class FormatadorDashboard {
         return df.format(Math.max(0.0, sane)) + "%";
     }
 
+    public static String formatarPercentualComSinal(double percentual) {
+        if (Double.isNaN(percentual) || Double.isInfinite(percentual)) {
+            return "0,0%";
+        }
+        double sane = sanitizeZero(percentual, 0.05);
+        DecimalFormat df = criarDecimalFormat("0.0");
+        if (sane < 0.0) {
+            return "-" + df.format(Math.abs(sane)) + "%";
+        }
+        return df.format(sane) + "%";
+    }
+
     public static String abreviarParaGrafico(double valor) {
         if (valor <= 0.0) {
             return "0";
@@ -91,6 +109,39 @@ public final class FormatadorDashboard {
             return df.format(valor / 1_000.0) + "k";
         }
         return String.valueOf(Math.round(valor));
+    }
+
+    public static String abreviarParaGraficoComSinal(double valor) {
+        if (Double.isNaN(valor) || Double.isInfinite(valor)) {
+            return "0";
+        }
+        double abs = Math.abs(valor);
+        if (abs < 0.5) {
+            return "0";
+        }
+        String abreviado = abreviarParaGrafico(abs);
+        if ("0".equals(abreviado)) {
+            return "0";
+        }
+        return valor < 0.0 ? "-" + abreviado : abreviado;
+    }
+
+    public static String formatarDataBR(String dataIso) {
+        if (dataIso == null || dataIso.trim().isEmpty()) {
+            return "";
+        }
+        String trimmed = dataIso.trim();
+        try {
+            LocalDate date = LocalDate.parse(trimmed, DateTimeFormatter.ISO_LOCAL_DATE);
+            return date.format(FORMATTER_BR_STRICT);
+        } catch (DateTimeParseException ignored) {
+        }
+        try {
+            LocalDate date = LocalDate.parse(trimmed, FORMATTER_BR_STRICT);
+            return date.format(FORMATTER_BR_STRICT);
+        } catch (DateTimeParseException ignored) {
+        }
+        return trimmed;
     }
 
     public static String getSiglaMes(String mesNumero) {

@@ -9,6 +9,7 @@
     <color name="brand_green">#2E7D32</color>
     <color name="brand_green_light">#E8F5E9</color>
     <color name="brand_green_bar_inactive">#A5D6A7</color>
+    <color name="cost_bar_inactive">#EF9A9A</color>
 
     <color name="surface_card">#FFFFFF</color>
     <color name="surface_subtle">#F5F7F5</color>
