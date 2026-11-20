@@ -216,12 +216,13 @@ public class ConfiguracaoActivity extends AppCompatActivity {
     private void exibirDialogoConfirmacaoImportacao(Uri uri, BackupController.PreviewBackup preview) {
         String msg = "Backup identificado com sucesso!\n\n"
                 + "• Viagens encontradas: " + preview.totalViagens + "\n"
+                + "• Custos encontrados: " + preview.totalCustos + "\n"
                 + "• Data do backup: " + preview.dataExportacao + "\n"
                 + (preview.contemConfiguracao && !preview.motoristaBackup.isEmpty() ? "• Motorista: " + preview.motoristaBackup + "\n\n" : "\n")
-                + "Como deseja importar essas viagens para este aparelho?";
+                + "Como deseja importar esses registros para este aparelho?";
 
         new AlertDialog.Builder(this)
-                .setTitle("Importar Viagens")
+                .setTitle("Importar Dados")
                 .setMessage(msg)
                 .setPositiveButton("Adicionar (Mesclar)", (dialog, which) -> {
                     executarImportacao(uri, false, preview.contemConfiguracao);
@@ -229,7 +230,7 @@ public class ConfiguracaoActivity extends AppCompatActivity {
                 .setNeutralButton("Substituir Tudo", (dialog, which) -> {
                     new AlertDialog.Builder(ConfiguracaoActivity.this)
                             .setTitle("Atenção: Substituir Dados")
-                            .setMessage("Todas as viagens cadastradas atualmente neste celular serão substituídas pelas viagens do backup. Deseja continuar?")
+                            .setMessage("Todas as viagens e custos cadastrados atualmente neste celular serão substituídos pelos registros do backup. Deseja continuar?")
                             .setPositiveButton("Sim, substituir", (d2, w2) -> {
                                 executarImportacao(uri, true, preview.contemConfiguracao);
                             })
@@ -254,8 +255,10 @@ public class ConfiguracaoActivity extends AppCompatActivity {
                     }
 
                     String mensagemSucesso = "Importação concluída com sucesso!\n\n"
-                            + "• Total no arquivo: " + resultado.totalNoArquivo + "\n"
+                            + "• Viagens no arquivo: " + resultado.totalNoArquivo + "\n"
                             + "• Viagens inseridas: " + resultado.totalImportadas + "\n"
+                            + "• Custos no arquivo: " + resultado.totalCustosNoArquivo + "\n"
+                            + "• Custos inseridos: " + resultado.totalCustosImportados + "\n"
                             + (resultado.configuracaoRestaurada ? "• Tarifas e configurações atualizadas.\n" : "");
 
                     new AlertDialog.Builder(ConfiguracaoActivity.this)

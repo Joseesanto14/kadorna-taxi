@@ -2,6 +2,7 @@ package com.digitalmuniz.kadornataxi.controller;
 
 import android.content.Context;
 import android.content.Intent;
+import android.database.sqlite.SQLiteDatabase;
 import android.net.Uri;
 import android.os.Environment;
 import android.util.Log;
@@ -9,8 +10,11 @@ import android.util.Log;
 import androidx.core.content.FileProvider;
 
 import com.digitalmuniz.kadornataxi.data.dao.ConfiguracaoDAO;
+import com.digitalmuniz.kadornataxi.data.dao.CustoDAO;
 import com.digitalmuniz.kadornataxi.data.dao.ViagemDAO;
+import com.digitalmuniz.kadornataxi.data.sqlite.DbHelper;
 import com.digitalmuniz.kadornataxi.model.entities.Configuracao;
+import com.digitalmuniz.kadornataxi.model.entities.Custo;
 import com.digitalmuniz.kadornataxi.model.entities.Servico;
 import com.digitalmuniz.kadornataxi.model.entities.Viagem;
 
@@ -42,19 +46,25 @@ public class BackupController {
 
     private static final String TAG = "BackupController";
     public static final String APP_SIGNATURE = "KadornaTaxi";
-    public static final int SCHEMA_VERSION = 2;
+    public static final int SCHEMA_VERSION = 3;
 
     /**
      * DTO para pré-visualização dos dados contidos no arquivo antes de confirmar a importação.
      */
     public static class PreviewBackup {
         public final int totalViagens;
+        public final int totalCustos;
         public final boolean contemConfiguracao;
         public final String dataExportacao;
         public final String motoristaBackup;
 
         public PreviewBackup(int totalViagens, boolean contemConfiguracao, String dataExportacao, String motoristaBackup) {
+            this(totalViagens, 0, contemConfiguracao, dataExportacao, motoristaBackup);
+        }
+
+        public PreviewBackup(int totalViagens, int totalCustos, boolean contemConfiguracao, String dataExportacao, String motoristaBackup) {
             this.totalViagens = totalViagens;
+            this.totalCustos = totalCustos;
             this.contemConfiguracao = contemConfiguracao;
             this.dataExportacao = dataExportacao;
             this.motoristaBackup = motoristaBackup;
@@ -67,29 +77,44 @@ public class BackupController {
     public static class ResultadoImportacao {
         public final int totalNoArquivo;
         public final int totalImportadas;
+        public final int totalCustosNoArquivo;
+        public final int totalCustosImportados;
         public final boolean configuracaoRestaurada;
 
         public ResultadoImportacao(int totalNoArquivo, int totalImportadas, boolean configuracaoRestaurada) {
+            this(totalNoArquivo, totalImportadas, 0, 0, configuracaoRestaurada);
+        }
+
+        public ResultadoImportacao(
+                int totalNoArquivo,
+                int totalImportadas,
+                int totalCustosNoArquivo,
+                int totalCustosImportados,
+                boolean configuracaoRestaurada
+        ) {
             this.totalNoArquivo = totalNoArquivo;
             this.totalImportadas = totalImportadas;
+            this.totalCustosNoArquivo = totalCustosNoArquivo;
+            this.totalCustosImportados = totalCustosImportados;
             this.configuracaoRestaurada = configuracaoRestaurada;
         }
     }
 
     /**
-     * Exporta todas as viagens e a configuração para um arquivo JSON estruturado
+     * Exporta todas as viagens, custos e a configuração para um arquivo JSON estruturado
      * e retorna a Intent pronta para a Android Share Sheet.
      */
     public static Intent gerarIntentExportacao(Context context) throws Exception {
         ViagemDAO viagemDAO = new ViagemDAO(context);
+        CustoDAO custoDAO = new CustoDAO(context);
         ConfiguracaoDAO configDAO = new ConfiguracaoDAO(context);
 
         List<Viagem> todasViagens = viagemDAO.getAll();
+        List<Custo> todosCustos = custoDAO.getAll();
         Configuracao config = configDAO.getConfiguracao();
-        JSONObject jsonRoot = construirBackupJson(todasViagens, config);
+        JSONObject jsonRoot = construirBackupJson(todasViagens, todosCustos, config);
         String dataFormatada = jsonRoot.optString("export_date", "");
 
-        // Salvar em arquivo no diretório de documentos do app
         File docsDir = context.getExternalFilesDir(Environment.DIRECTORY_DOCUMENTS);
         if (docsDir != null && !docsDir.exists()) {
             docsDir.mkdirs();
@@ -105,22 +130,31 @@ public class BackupController {
             writer.flush();
         }
 
-        Log.d(TAG, "Backup exportado com sucesso: " + arquivoBackup.getAbsolutePath() + " (" + todasViagens.size() + " viagens)");
+        Log.d(TAG, "Backup exportado com sucesso: " + arquivoBackup.getAbsolutePath()
+                + " (" + todasViagens.size() + " viagens, " + todosCustos.size() + " custos)");
 
-        // Criar URI compatível com FileProvider
         Uri fileUri = FileProvider.getUriForFile(context, context.getPackageName() + ".provider", arquivoBackup);
 
         Intent shareIntent = new Intent(Intent.ACTION_SEND);
         shareIntent.setType("application/json");
         shareIntent.putExtra(Intent.EXTRA_STREAM, fileUri);
         shareIntent.putExtra(Intent.EXTRA_SUBJECT, "Backup Kadorna Taxi - " + timeStampArquivo);
-        shareIntent.putExtra(Intent.EXTRA_TEXT, "Arquivo de backup do Kadorna Taxi gerado em " + dataFormatada + " com " + todasViagens.size() + " viagens.");
+        shareIntent.putExtra(Intent.EXTRA_TEXT, "Arquivo de backup do Kadorna Taxi gerado em " + dataFormatada
+                + " com " + todasViagens.size() + " viagens e " + todosCustos.size() + " custos.");
         shareIntent.addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION);
 
         return Intent.createChooser(shareIntent, "Exportar / Compartilhar Backup");
     }
 
     public static JSONObject construirBackupJson(List<Viagem> todasViagens, Configuracao config) throws JSONException {
+        return construirBackupJson(todasViagens, Collections.emptyList(), config);
+    }
+
+    public static JSONObject construirBackupJson(
+            List<Viagem> todasViagens,
+            List<Custo> todosCustos,
+            Configuracao config
+    ) throws JSONException {
         JSONObject jsonRoot = new JSONObject();
         jsonRoot.put("app", APP_SIGNATURE);
         jsonRoot.put("schema_version", SCHEMA_VERSION);
@@ -177,6 +211,23 @@ public class BackupController {
             }
         }
         jsonRoot.put("viagens", jsonViagens);
+
+        // Serializar Custos
+        JSONArray jsonCustos = new JSONArray();
+        if (todosCustos != null) {
+            for (Custo c : todosCustos) {
+                if (c == null) {
+                    continue;
+                }
+                JSONObject item = new JSONObject();
+                item.put("descricao", c.getDescricao());
+                item.put("valor", c.getValor());
+                item.put("data", c.getData());
+                jsonCustos.put(item);
+            }
+        }
+        jsonRoot.put("custos", jsonCustos);
+
         return jsonRoot;
     }
 
@@ -191,6 +242,9 @@ public class BackupController {
         JSONArray viagensArray = root.optJSONArray("viagens");
         int totalViagens = viagensArray != null ? viagensArray.length() : 0;
 
+        JSONArray custosArray = root.optJSONArray("custos");
+        int totalCustos = custosArray != null ? custosArray.length() : 0;
+
         boolean contemConfig = root.has("configuracao");
         String dataExportacao = root.optString("export_date", "Data desconhecida");
         String motorista = "";
@@ -202,11 +256,11 @@ public class BackupController {
             }
         }
 
-        return new PreviewBackup(totalViagens, contemConfig, dataExportacao, motorista);
+        return new PreviewBackup(totalViagens, totalCustos, contemConfig, dataExportacao, motorista);
     }
 
     /**
-     * Importa as viagens e opcionalmente as configurações a partir do arquivo JSON selecionado.
+     * Importa as viagens, custos e opcionalmente as configurações a partir do arquivo JSON selecionado.
      * Preserva estritamente os valores financeiros históricos sem recálculo dinâmico.
      */
     public static ResultadoImportacao importarBackup(Context context, Uri uri, boolean substituirExistentes, boolean restaurarConfiguracao) throws Exception {
@@ -271,33 +325,75 @@ public class BackupController {
             }
         }
 
-        // Inserção atômica no banco de dados
-        ViagemDAO viagemDAO = new ViagemDAO(context);
-        int totalImportadas = viagemDAO.inserirLote(listaViagens, substituirExistentes);
-
-        // Restauração de configurações se solicitado
-        boolean configuracaoRestaurada = false;
-        if (restaurarConfiguracao && root.has("configuracao")) {
-            JSONObject cfgJson = root.getJSONObject("configuracao");
-            Configuracao novaConfig = new Configuracao(
-                    1,
-                    (float) cfgJson.optDouble("valorKmRodado", 0.0),
-                    (float) cfgJson.optDouble("valorHoraEspera", 0.0),
-                    cfgJson.optString("motorista", ""),
-                    cfgJson.optString("classificacaoViagemSeparada", "Comum"),
-                    cfgJson.optString("cnpj", ""),
-                    cfgJson.optString("nomeFantasia", ""),
-                    cfgJson.optString("titularCNPJ", ""),
-                    cfgJson.optString("telefone", ""),
-                    cfgJson.optString("email", "")
-            );
-
-            new ConfiguracaoDAO(context).salvarConfiguracaoSilenciosamente(novaConfig);
-            configuracaoRestaurada = true;
+        JSONArray custosArray = root.optJSONArray("custos");
+        List<Custo> listaCustos = new ArrayList<>();
+        if (custosArray != null) {
+            for (int i = 0; i < custosArray.length(); i++) {
+                JSONObject item = custosArray.optJSONObject(i);
+                if (item == null) {
+                    continue;
+                }
+                String descricao = item.optString("descricao", "").trim();
+                double valor = item.optDouble("valor", 0.0);
+                String data = item.optString("data", "").trim();
+                if (!descricao.isEmpty() && !Double.isNaN(valor) && !Double.isInfinite(valor) && valor > 0.0 && !data.isEmpty()) {
+                    listaCustos.add(new Custo(descricao, valor, data));
+                }
+            }
         }
 
-        Log.d(TAG, "Importação concluída. Lidas: " + listaViagens.size() + ", Inseridas: " + totalImportadas + ", Config: " + configuracaoRestaurada);
-        return new ResultadoImportacao(listaViagens.size(), totalImportadas, configuracaoRestaurada);
+        // Inserção atômica em transação SQLite única cobrindo viagens, serviços e custos
+        DbHelper dbHelper = DbHelper.getInstance(context);
+        SQLiteDatabase db = dbHelper.getWritableDatabase();
+        ViagemDAO viagemDAO = new ViagemDAO(dbHelper);
+        CustoDAO custoDAO = new CustoDAO(dbHelper);
+
+        int totalImportadas;
+        int totalCustosImportados;
+        boolean configuracaoRestaurada = false;
+
+        db.beginTransactionNonExclusive();
+        try {
+            totalImportadas = viagemDAO.inserirLote(listaViagens, substituirExistentes);
+            totalCustosImportados = custoDAO.inserirLote(db, listaCustos, substituirExistentes);
+
+            if (restaurarConfiguracao && root.has("configuracao")) {
+                JSONObject cfgJson = root.getJSONObject("configuracao");
+                Configuracao novaConfig = new Configuracao(
+                        1,
+                        (float) cfgJson.optDouble("valorKmRodado", 0.0),
+                        (float) cfgJson.optDouble("valorHoraEspera", 0.0),
+                        cfgJson.optString("motorista", ""),
+                        cfgJson.optString("classificacaoViagemSeparada", "Comum"),
+                        cfgJson.optString("cnpj", ""),
+                        cfgJson.optString("nomeFantasia", ""),
+                        cfgJson.optString("titularCNPJ", ""),
+                        cfgJson.optString("telefone", ""),
+                        cfgJson.optString("email", "")
+                );
+
+                new ConfiguracaoDAO(dbHelper).salvarConfiguracaoSilenciosamente(novaConfig);
+                configuracaoRestaurada = true;
+            }
+
+            db.setTransactionSuccessful();
+        } finally {
+            db.endTransaction();
+        }
+
+        Log.d(TAG, "Importação concluída. Viagens lidas: " + listaViagens.size()
+                + ", inseridas: " + totalImportadas
+                + ", Custos lidos: " + listaCustos.size()
+                + ", inseridos: " + totalCustosImportados
+                + ", Config: " + configuracaoRestaurada);
+
+        return new ResultadoImportacao(
+                listaViagens.size(),
+                totalImportadas,
+                listaCustos.size(),
+                totalCustosImportados,
+                configuracaoRestaurada
+        );
     }
 
     private static JSONObject lerJsonObjectDeUri(Context context, Uri uri) throws IOException, Exception {
