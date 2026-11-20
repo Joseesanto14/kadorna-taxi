@@ -9,61 +9,65 @@ import android.widget.Toast;
 
 import com.digitalmuniz.kadornataxi.data.sqlite.DbHelper;
 import com.digitalmuniz.kadornataxi.model.entities.Viagem;
+import com.digitalmuniz.kadornataxi.view.dto.GrupoViagens;
+import com.digitalmuniz.kadornataxi.view.dto.PaginaViagensResult;
+import com.digitalmuniz.kadornataxi.view.dto.ViagemCursorKey;
+import com.digitalmuniz.kadornataxi.view.dto.ViagensFiltro;
 
+import java.time.YearMonth;
+import java.time.format.DateTimeParseException;
 import java.util.ArrayList;
+import java.util.Collections;
 import java.util.List;
 
 public class ViagemDAO {
-    private SQLiteDatabase database;
+    private static final String TAG = "ViagemDAO";
     private final DbHelper dbHelper;
 
-    private void open() {
-        database = dbHelper.getWritableDatabase();
-    }
-
-    private void close() {
-        dbHelper.close();
-    }
-
     public ViagemDAO(Context context) {
-        dbHelper = new DbHelper(context);
+        this.dbHelper = DbHelper.getInstance(context);
+    }
+
+    public ViagemDAO(DbHelper dbHelper) {
+        this.dbHelper = dbHelper;
     }
 
     // CREATE - Inserir um novo registro (viagem)
 
     public void inserirNoDatabase(Viagem viagem, Context context) {
-        open();
-
-        Log.d("ViagemDAO", "Viagem inserida com o ID: " + insert(viagem));
+        long id = inserir(viagem);
+        Log.d(TAG, "Viagem inserida com o ID: " + id);
         Toast.makeText(context, "Viagem criada com sucesso!", Toast.LENGTH_SHORT).show();
+    }
 
-        close();
+    public long inserir(Viagem viagem) {
+        SQLiteDatabase db = dbHelper.getWritableDatabase();
+        return insert(db, viagem);
     }
 
     public int inserirLote(List<Viagem> viagens, boolean substituirExistentes) {
-        open();
+        SQLiteDatabase db = dbHelper.getWritableDatabase();
         int inseridos = 0;
-        database.beginTransaction();
+        db.beginTransactionNonExclusive();
         try {
             if (substituirExistentes) {
-                database.delete(DbHelper.Viagem.NOME_TABELA, null, null);
+                db.delete(DbHelper.Viagem.NOME_TABELA, null, null);
             }
             for (Viagem viagem : viagens) {
-                if (!substituirExistentes && existeViagemDuplicada(viagem)) {
+                if (!substituirExistentes && existeViagemDuplicada(db, viagem)) {
                     continue;
                 }
-                insert(viagem);
+                insert(db, viagem);
                 inseridos++;
             }
-            database.setTransactionSuccessful();
+            db.setTransactionSuccessful();
         } finally {
-            database.endTransaction();
-            close();
+            db.endTransaction();
         }
         return inseridos;
     }
 
-    private boolean existeViagemDuplicada(Viagem viagem) {
+    private boolean existeViagemDuplicada(SQLiteDatabase db, Viagem viagem) {
         String dataFormatada = Viagem.formatarDataISO8601(viagem.getData());
         String selecao = DbHelper.Viagem.DATA + " = ? AND " +
                 DbHelper.Viagem.HORA + " = ? AND " +
@@ -76,103 +80,20 @@ public class ViagemDAO {
                 String.valueOf(viagem.getValorTotal())
         };
 
-        try (Cursor cursor = database.query(DbHelper.Viagem.NOME_TABELA,
+        try (Cursor cursor = db.query(DbHelper.Viagem.NOME_TABELA,
                 new String[]{DbHelper.Viagem.ID},
                 selecao, args, null, null, null)) {
             return cursor != null && cursor.getCount() > 0;
         }
     }
 
-    private long insert(Viagem viagem) {
+    private ContentValues toContentValues(Viagem viagem) {
         ContentValues values = new ContentValues();
-        
-        values.put(DbHelper.Viagem.ORIGEM, 
-                viagem.getOrigem());
-        values.put(DbHelper.Viagem.DATA, 
-                Viagem.formatarDataISO8601(viagem.getData()));
-        values.put(DbHelper.Viagem.HORA, 
-                viagem.getHora());
-        values.put(DbHelper.Viagem.DESTINO, 
-                viagem.getDestino());
-        values.put(DbHelper.Viagem.DESCRICAO, 
-                viagem.getDescricao());
-        values.put(DbHelper.Viagem.KMS_RODADOS, 
-                viagem.getKmsRodados());
-        values.put(DbHelper.Viagem.VALOR_KM,
-                viagem.getValorKms());
-        values.put(DbHelper.Viagem.VALOR_SERVICO,
-                viagem.getValorServico());
-        values.put(DbHelper.Viagem.MOTORISTA, 
-                viagem.getMotorista());
-        values.put(DbHelper.Viagem.HORA_ESPERA, 
-                viagem.getHoraEspera());
-        values.put(DbHelper.Viagem.VALOR_HORA_ESPERA, 
-                viagem.getValorHoraEspera());
-        values.put(DbHelper.Viagem.CLASSIFICACAO,
-                viagem.getClassificacao());
-        values.put(DbHelper.Viagem.VALOR_TOTAL,
-                viagem.getValorTotal());
-        values.put(DbHelper.Viagem.SOLICITANTE,
-                viagem.getSolicitante());
+        String dataIso = Viagem.formatarDataISO8601(viagem.getData());
 
-        return database.insert(DbHelper.Viagem.NOME_TABELA, null, values);
-    }
-
-    // READ - Listar todos os registros (viagens)
-
-    public List<Viagem> getAllOrdenadoPorDataDesc() {
-        open();
-
-        List<Viagem> lista = new ArrayList<>();
-
-        Cursor cursor = database.query(DbHelper.Viagem.NOME_TABELA,
-                null, null, null,
-                null, null, DbHelper.Viagem.DATA + " DESC, " + DbHelper.Viagem.HORA + " DESC");
-
-        if (cursor.moveToFirst()) {
-            do {
-                lista.add(cursorToViagem(cursor));
-            } while (cursor.moveToNext());
-        }
-
-        cursor.close();
-
-        close();
-
-        return lista;
-    }
-
-    public List<Viagem> getAll() {
-        open();
-
-        List<Viagem> lista = new ArrayList<>();
-
-        Cursor cursor = database.query(DbHelper.Viagem.NOME_TABELA,
-                null, null, null,
-                null, null, null);
-
-        if (cursor.moveToFirst()) {
-            do {
-                lista.add(cursorToViagem(cursor));
-            } while (cursor.moveToNext());
-        }
-
-        cursor.close();
-
-        close();
-
-        return lista;
-    }
-
-    // UPTADE - atualizar os resgistros (viagem)
-
-    public int update(Viagem viagem) {
-        open();
-
-        ContentValues values = new ContentValues();
         values.put(DbHelper.Viagem.ORIGEM, viagem.getOrigem());
-        values.put(DbHelper.Viagem.DATA, Viagem.formatarDataISO8601(viagem.getData()));
-        values.put(DbHelper.Viagem.HORA, viagem.getHora());
+        values.put(DbHelper.Viagem.DATA, dataIso != null ? dataIso : "");
+        values.put(DbHelper.Viagem.HORA, viagem.getHora() != null ? viagem.getHora() : "");
         values.put(DbHelper.Viagem.DESTINO, viagem.getDestino());
         values.put(DbHelper.Viagem.DESCRICAO, viagem.getDescricao());
         values.put(DbHelper.Viagem.KMS_RODADOS, viagem.getKmsRodados());
@@ -184,133 +105,373 @@ public class ViagemDAO {
         values.put(DbHelper.Viagem.CLASSIFICACAO, viagem.getClassificacao());
         values.put(DbHelper.Viagem.VALOR_TOTAL, viagem.getValorTotal());
         values.put(DbHelper.Viagem.SOLICITANTE, viagem.getSolicitante());
+        return values;
+    }
 
-        int linhasAfetadas = database.update(DbHelper.Viagem.NOME_TABELA, values,
+    private long insert(SQLiteDatabase db, Viagem viagem) {
+        return db.insert(DbHelper.Viagem.NOME_TABELA, null, toContentValues(viagem));
+    }
+
+    // READ - Consultas paginadas com Keyset / Seek Pagination + Range Scan
+
+    public List<GrupoViagens> getGrupos(ViagensFiltro filtro) {
+        SQLiteDatabase db = dbHelper.getReadableDatabase();
+        List<GrupoViagens> grupos = new ArrayList<>();
+        List<String> args = new ArrayList<>();
+
+        StringBuilder sql = new StringBuilder();
+        sql.append("SELECT ")
+                .append("CASE WHEN ").append(DbHelper.Viagem.CLASSIFICACAO).append(" IS NOT NULL ")
+                .append("AND ").append(DbHelper.Viagem.CLASSIFICACAO).append(" != '' ")
+                .append("AND ").append(DbHelper.Viagem.CLASSIFICACAO).append(" != 'Comum' ")
+                .append("THEN substr(COALESCE(").append(DbHelper.Viagem.DATA).append(", ''), 1, 7) || '-' || ")
+                .append(DbHelper.Viagem.CLASSIFICACAO).append(" ")
+                .append("ELSE substr(COALESCE(").append(DbHelper.Viagem.DATA).append(", ''), 1, 7) ")
+                .append("END AS mes_ano, ")
+                .append("COUNT(*) AS total_viagens ")
+                .append("FROM ").append(DbHelper.Viagem.NOME_TABELA).append(" ");
+
+        StringBuilder where = new StringBuilder();
+        appendFiltroWhere(where, args, filtro);
+        if (where.length() > 0) {
+            sql.append("WHERE ").append(where).append(" ");
+        }
+
+        sql.append("GROUP BY mes_ano ")
+                .append("ORDER BY substr(COALESCE(").append(DbHelper.Viagem.DATA).append(", ''), 1, 7) DESC, mes_ano ASC");
+
+        try (Cursor cursor = db.rawQuery(sql.toString(), args.toArray(new String[0]))) {
+            while (cursor != null && cursor.moveToNext()) {
+                String mesAno = cursor.getString(0);
+                int total = cursor.getInt(1);
+                grupos.add(new GrupoViagens(mesAno, total));
+            }
+        }
+        return grupos;
+    }
+
+    public PaginaViagensResult getPaginaDoGrupo(
+            String mesAno,
+            ViagensFiltro filtro,
+            ViagemCursorKey cursorKey,
+            int pageSize
+    ) {
+        if (mesAno == null) {
+            return new PaginaViagensResult(Collections.emptyList(), false, null);
+        }
+
+        int effectivePageSize = Math.max(1, pageSize);
+        SQLiteDatabase db = dbHelper.getReadableDatabase();
+        List<String> args = new ArrayList<>();
+        StringBuilder where = new StringBuilder();
+
+        appendGrupoWhere(where, args, mesAno);
+        appendFiltroWhere(where, args, filtro);
+
+        if (cursorKey != null) {
+            String cursorData = cursorKey.getData();
+            String cursorHora = cursorKey.getHora();
+            String cursorId = String.valueOf(cursorKey.getId());
+            if (where.length() > 0) {
+                where.append(" AND ");
+            }
+            // Limita o teto do range scan no índice e aplica desempate determinístico (data, hora, id).
+            where.append(DbHelper.Viagem.DATA).append(" <= ? AND (")
+                    .append(DbHelper.Viagem.DATA).append(" < ? OR (")
+                    .append(DbHelper.Viagem.DATA).append(" = ? AND ").append(DbHelper.Viagem.HORA).append(" < ?) OR (")
+                    .append(DbHelper.Viagem.DATA).append(" = ? AND ").append(DbHelper.Viagem.HORA).append(" = ? AND ")
+                    .append(DbHelper.Viagem.ID).append(" < ?))");
+            args.add(cursorData);
+            args.add(cursorData);
+            args.add(cursorData);
+            args.add(cursorHora);
+            args.add(cursorData);
+            args.add(cursorHora);
+            args.add(cursorId);
+        }
+
+        String sql = "SELECT * FROM " + DbHelper.Viagem.NOME_TABELA +
+                " WHERE " + where +
+                " ORDER BY " + DbHelper.Viagem.DATA + " DESC, " +
+                DbHelper.Viagem.HORA + " DESC, " +
+                DbHelper.Viagem.ID + " DESC LIMIT ?";
+        args.add(String.valueOf(effectivePageSize + 1));
+
+        List<Viagem> encontrados = new ArrayList<>(effectivePageSize + 1);
+        try (Cursor cursor = db.rawQuery(sql, args.toArray(new String[0]))) {
+            while (cursor != null && cursor.moveToNext()) {
+                encontrados.add(cursorToViagem(cursor));
+            }
+        }
+
+        boolean temMais = encontrados.size() > effectivePageSize;
+        List<Viagem> pagina = temMais
+                ? new ArrayList<>(encontrados.subList(0, effectivePageSize))
+                : encontrados;
+
+        ViagemCursorKey proximoCursor = null;
+        if (temMais && !pagina.isEmpty()) {
+            Viagem ultimo = pagina.get(pagina.size() - 1);
+            proximoCursor = new ViagemCursorKey(ultimo.getData(), ultimo.getHora(), ultimo.getId());
+        }
+
+        return new PaginaViagensResult(pagina, temMais, proximoCursor);
+    }
+
+    public List<Viagem> getViagensDoGrupoParaPdf(String mesAno) {
+        if (mesAno == null) {
+            return Collections.emptyList();
+        }
+
+        SQLiteDatabase db = dbHelper.getReadableDatabase();
+        List<String> args = new ArrayList<>();
+        StringBuilder where = new StringBuilder();
+        appendGrupoWhere(where, args, mesAno);
+
+        String sql = "SELECT * FROM " + DbHelper.Viagem.NOME_TABELA +
+                " WHERE " + where +
+                " ORDER BY " + DbHelper.Viagem.DATA + " ASC, " +
+                DbHelper.Viagem.HORA + " ASC, " +
+                DbHelper.Viagem.ID + " ASC";
+
+        List<Viagem> lista = new ArrayList<>();
+        try (Cursor cursor = db.rawQuery(sql, args.toArray(new String[0]))) {
+            while (cursor != null && cursor.moveToNext()) {
+                lista.add(cursorToViagem(cursor));
+            }
+        }
+        return lista;
+    }
+
+    private void appendGrupoWhere(StringBuilder where, List<String> args, String mesAno) {
+        GrupoSpec spec = parseGrupoMesAno(mesAno);
+        if (spec.dataInicio != null && spec.dataFimExclusiva != null) {
+            where.append(DbHelper.Viagem.DATA).append(" >= ? AND ")
+                    .append(DbHelper.Viagem.DATA).append(" < ?");
+            args.add(spec.dataInicio);
+            args.add(spec.dataFimExclusiva);
+        } else {
+            where.append("COALESCE(").append(DbHelper.Viagem.DATA).append(", '') = ''");
+        }
+
+        where.append(" AND ");
+        if (spec.classificacaoEspecifica != null) {
+            where.append(DbHelper.Viagem.CLASSIFICACAO).append(" = ?");
+            args.add(spec.classificacaoEspecifica);
+        } else {
+            // COALESCE evita MULTI-INDEX OR no idx_viagem_classif_data_hora_id e preserva range scan ordenado em idx_viagem_data_hora_id.
+            where.append("COALESCE(").append(DbHelper.Viagem.CLASSIFICACAO).append(", '') IN ('', 'Comum')");
+        }
+    }
+
+    private void appendFiltroWhere(StringBuilder where, List<String> args, ViagensFiltro filtro) {
+        if (filtro == null) {
+            return;
+        }
+        if (filtro.isSomenteEmpresas()) {
+            if (where.length() > 0) {
+                where.append(" AND ");
+            }
+            where.append(DbHelper.Viagem.CLASSIFICACAO).append(" IS NOT NULL AND ")
+                    .append(DbHelper.Viagem.CLASSIFICACAO).append(" != '' AND ")
+                    .append(DbHelper.Viagem.CLASSIFICACAO).append(" != 'Comum'");
+        }
+        if (filtro.hasTextoBusca()) {
+            if (where.length() > 0) {
+                where.append(" AND ");
+            }
+            String likePattern = "%" + ViagensFiltro.escapeLike(filtro.getTextoBusca()) + "%";
+            where.append("(COALESCE(").append(DbHelper.Viagem.DESTINO).append(", '') LIKE ? ESCAPE '\\' OR ")
+                    .append("COALESCE(").append(DbHelper.Viagem.ORIGEM).append(", '') LIKE ? ESCAPE '\\' OR ")
+                    .append("COALESCE(").append(DbHelper.Viagem.DATA).append(", '') LIKE ? ESCAPE '\\' OR ")
+                    .append("COALESCE(").append(DbHelper.Viagem.MOTORISTA).append(", '') LIKE ? ESCAPE '\\' OR ")
+                    .append("COALESCE(").append(DbHelper.Viagem.DESCRICAO).append(", '') LIKE ? ESCAPE '\\' OR ")
+                    .append("COALESCE(").append(DbHelper.Viagem.CLASSIFICACAO).append(", '') LIKE ? ESCAPE '\\' OR ")
+                    .append("COALESCE(").append(DbHelper.Viagem.SOLICITANTE).append(", '') LIKE ? ESCAPE '\\')");
+            for (int i = 0; i < 7; i++) {
+                args.add(likePattern);
+            }
+        }
+    }
+
+    private GrupoSpec parseGrupoMesAno(String mesAno) {
+        if (mesAno.length() >= 7 && mesAno.charAt(4) == '-') {
+            try {
+                YearMonth ym = YearMonth.parse(mesAno.substring(0, 7));
+                String inicioMes = ym.atDay(1).toString();
+                String inicioProximoMes = ym.plusMonths(1).atDay(1).toString();
+                String classificacao = (mesAno.length() > 8 && mesAno.charAt(7) == '-')
+                        ? mesAno.substring(8)
+                        : null;
+                return new GrupoSpec(inicioMes, inicioProximoMes, classificacao);
+            } catch (DateTimeParseException ignored) {
+                // Fallback para registros legados com data fora do padrão ISO yyyy-MM
+            }
+        }
+        String classificacao = mesAno.startsWith("-") && mesAno.length() > 1
+                ? mesAno.substring(1)
+                : null;
+        return new GrupoSpec(null, null, classificacao);
+    }
+
+    private static class GrupoSpec {
+        final String dataInicio;
+        final String dataFimExclusiva;
+        final String classificacaoEspecifica;
+
+        GrupoSpec(String dataInicio, String dataFimExclusiva, String classificacaoEspecifica) {
+            this.dataInicio = dataInicio;
+            this.dataFimExclusiva = dataFimExclusiva;
+            this.classificacaoEspecifica = classificacaoEspecifica;
+        }
+    }
+
+    // READ - Listar todos os registros (viagens)
+
+    public List<Viagem> getAllOrdenadoPorDataDesc() {
+        SQLiteDatabase db = dbHelper.getReadableDatabase();
+        List<Viagem> lista = new ArrayList<>();
+
+        try (Cursor cursor = db.query(DbHelper.Viagem.NOME_TABELA,
+                null, null, null,
+                null, null,
+                DbHelper.Viagem.DATA + " DESC, " + DbHelper.Viagem.HORA + " DESC, " + DbHelper.Viagem.ID + " DESC")) {
+            while (cursor != null && cursor.moveToNext()) {
+                lista.add(cursorToViagem(cursor));
+            }
+        }
+        return lista;
+    }
+
+    public List<Viagem> getAll() {
+        SQLiteDatabase db = dbHelper.getReadableDatabase();
+        List<Viagem> lista = new ArrayList<>();
+
+        try (Cursor cursor = db.query(DbHelper.Viagem.NOME_TABELA,
+                null, null, null,
+                null, null, null)) {
+            while (cursor != null && cursor.moveToNext()) {
+                lista.add(cursorToViagem(cursor));
+            }
+        }
+        return lista;
+    }
+
+    // UPDATE - atualizar os registros (viagem)
+
+    public int update(Viagem viagem) {
+        SQLiteDatabase db = dbHelper.getWritableDatabase();
+        return db.update(DbHelper.Viagem.NOME_TABELA, toContentValues(viagem),
                 DbHelper.Viagem.ID + " = ?", new String[]{String.valueOf(viagem.getId())});
-
-        close();
-        return linhasAfetadas;
     }
 
     // DELETE - remover um registro do banco de dados
 
     public int delete(long id) {
-        open();
-        
-        int linhasAfetadas = database.delete(DbHelper.Viagem.NOME_TABELA,
+        SQLiteDatabase db = dbHelper.getWritableDatabase();
+        return db.delete(DbHelper.Viagem.NOME_TABELA,
                 DbHelper.Viagem.ID + " = ?", new String[]{String.valueOf(id)});
-
-        close();
-
-        return linhasAfetadas;
     }
 
     // DELETAR TODOS - remover todos os registros do banco de dados
 
     public int deleteAll() {
-        open();
-        int linhasAfetadas = database.delete(DbHelper.Viagem.NOME_TABELA,
-                null, null);
-        close();
-
-        return linhasAfetadas;
+        SQLiteDatabase db = dbHelper.getWritableDatabase();
+        return db.delete(DbHelper.Viagem.NOME_TABELA, null, null);
     }
 
     // CONTAR TODOS OS REGISTROS
 
     public int getCount() {
-        open();
-        int count = 0;
-        try (Cursor cursor = database.rawQuery("SELECT COUNT(*) FROM " + DbHelper.Viagem.NOME_TABELA, null)) {
+        SQLiteDatabase db = dbHelper.getReadableDatabase();
+        try (Cursor cursor = db.rawQuery("SELECT COUNT(*) FROM " + DbHelper.Viagem.NOME_TABELA, null)) {
             if (cursor != null && cursor.moveToFirst()) {
-                count = cursor.getInt(0);
+                return cursor.getInt(0);
             }
         }
-        close();
-        return count;
+        return 0;
     }
 
     // BUSCAR UM REGISTRO USANDO OUTROS DADOS
 
     public Viagem getViagemById(long id) {
-        open();
-        close();
+        SQLiteDatabase db = dbHelper.getReadableDatabase();
+        try (Cursor cursor = db.query(
+                DbHelper.Viagem.NOME_TABELA,
+                null,
+                DbHelper.Viagem.ID + " = ?",
+                new String[]{String.valueOf(id)},
+                null, null, null)) {
+            if (cursor != null && cursor.moveToFirst()) {
+                return cursorToViagem(cursor);
+            }
+        }
         return null;
     }
 
     public List<Viagem> getViagemByLocal(String local) {
-        open();
+        SQLiteDatabase db = dbHelper.getReadableDatabase();
         List<Viagem> lista = new ArrayList<>();
 
-        Cursor cursor = database.query(DbHelper.Viagem.NOME_TABELA,
+        try (Cursor cursor = db.query(DbHelper.Viagem.NOME_TABELA,
                 null,
                 DbHelper.Viagem.ORIGEM + " = ? OR " +
                         DbHelper.Viagem.DESTINO + " = ?",
-                new String[]{local, local}, null, null, null);
-
-        while (cursor.moveToNext()) {
-            lista.add(cursorToViagem(cursor));
+                new String[]{local, local}, null, null, null)) {
+            while (cursor != null && cursor.moveToNext()) {
+                lista.add(cursorToViagem(cursor));
+            }
         }
-
-        cursor.close();
-        close();
         return lista;
     }
 
     public List<Viagem> getViagemByDestino(String destino) {
-        open();
+        SQLiteDatabase db = dbHelper.getReadableDatabase();
         List<Viagem> lista = new ArrayList<>();
 
-        Cursor cursor = database.query(DbHelper.Viagem.NOME_TABELA,
-                null, DbHelper.Viagem.DESTINO +
-                        " = ?", new String[]{destino}, null,
-                null, null);
-
-        while (cursor.moveToNext()) {
-            lista.add(cursorToViagem(cursor));
+        try (Cursor cursor = db.query(DbHelper.Viagem.NOME_TABELA,
+                null, DbHelper.Viagem.DESTINO + " = ?",
+                new String[]{destino}, null, null, null)) {
+            while (cursor != null && cursor.moveToNext()) {
+                lista.add(cursorToViagem(cursor));
+            }
         }
-
-        cursor.close();
-        close();
         return lista;
     }
 
     public List<Viagem> getViagemByPeriodo(String anoMes) {
-        open();
+        SQLiteDatabase db = dbHelper.getReadableDatabase();
         List<Viagem> lista = new ArrayList<>();
 
-        Cursor cursor = database.query(
+        try (Cursor cursor = db.query(
                 DbHelper.Viagem.NOME_TABELA,
                 null,
                 DbHelper.Viagem.DATA + " LIKE ?",
                 new String[]{anoMes + "%"},
                 null, null,
-                DbHelper.Viagem.DATA + " ASC");
-
-        if (cursor.moveToFirst()) {
-            do {
+                DbHelper.Viagem.DATA + " ASC")) {
+            while (cursor != null && cursor.moveToNext()) {
                 lista.add(cursorToViagem(cursor));
-            } while (cursor.moveToNext());
+            }
         }
-
-        cursor.close();
-        close();
         return lista;
     }
 
     public List<Viagem> getViagensByIntervalo(String dataInicio, String dataFim) {
+        SQLiteDatabase db = dbHelper.getReadableDatabase();
         List<Viagem> lista = new ArrayList<>();
 
-        Cursor cursor = database.query(DbHelper.Viagem.NOME_TABELA,
+        String inicio = dataInicio != null ? dataInicio : "";
+        String fim = dataFim != null ? dataFim : "";
+
+        try (Cursor cursor = db.query(DbHelper.Viagem.NOME_TABELA,
                 null, DbHelper.Viagem.DATA + " BETWEEN ? AND ?",
-                new String[]{dataInicio, dataFim}, null, null, null);
-
-        while (cursor.moveToNext()) {
-            lista.add(cursorToViagem(cursor));
+                new String[]{inicio, fim}, null, null,
+                DbHelper.Viagem.DATA + " ASC, " + DbHelper.Viagem.HORA + " ASC, " + DbHelper.Viagem.ID + " ASC")) {
+            while (cursor != null && cursor.moveToNext()) {
+                lista.add(cursorToViagem(cursor));
+            }
         }
-
-        cursor.close();
-
         return lista;
     }
 

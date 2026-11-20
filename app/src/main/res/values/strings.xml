@@ -3,4 +3,37 @@
     <string name="cd_editar_viagem">Editar viagem</string>
     <string name="cd_excluir_viagem">Excluir viagem</string>
     <string name="editar_viagem">Editar Viagem</string>
+
+    <!-- Navegação Principal -->
+    <string name="titulo_minhas_viagens">Minhas Viagens</string>
+    <string name="titulo_dashboard_financeiro">Dashboard Financeiro</string>
+    <string name="nav_viagens">Viagens</string>
+    <string name="nav_dashboard">Dashboard</string>
+
+    <!-- Dashboard -->
+    <string name="dashboard_ano_completo">Ano Completo</string>
+    <string name="dashboard_faturamento_label">Faturamento</string>
+    <string name="dashboard_vs_mes_anterior">vs. mês anterior</string>
+    <string name="dashboard_vs_ano_anterior">vs. ano anterior</string>
+    <string name="dashboard_sem_historico_anterior">Sem base anterior para comparação</string>
+    <string name="dashboard_kpi_kms">KM Rodados</string>
+    <string name="dashboard_kpi_reais_km">R$/KM</string>
+    <string name="dashboard_kpi_espera">Horas de Espera</string>
+    <string name="dashboard_kpi_media_dia">Média por Dia</string>
+    <string name="dashboard_composicao_titulo">Composição da Receita</string>
+    <string name="dashboard_composicao_km">KM Rodado</string>
+    <string name="dashboard_composicao_espera">Hora de Espera</string>
+    <string name="dashboard_composicao_servicos">Serviços Extras</string>
+    <string name="dashboard_evolucao_titulo">Evolução Anual</string>
+    <string name="dashboard_evolucao_dica">Toque em uma barra para filtrar o mês</string>
+    <string name="dashboard_clientes_titulo">Receita por Cliente / Classificação</string>
+    <string name="dashboard_empty_titulo">Sem viagens registradas ainda</string>
+    <string name="dashboard_empty_subtitulo">Registre sua primeira viagem para acompanhar faturamento, médias e evolução mensal.</string>
+    <string name="dashboard_cta_registrar">Registrar Viagem</string>
+    <string name="configure_app_primeiro">Configure o app primeiro!</string>
+    <string name="dashboard_erro_titulo">Não foi possível carregar o dashboard</string>
+    <string name="dashboard_tentar_novamente">Tentar Novamente</string>
+    <string name="cd_evolucao_chart">Gráfico de evolução mensal do faturamento</string>
+    <string name="cd_delta_icon">Indicador de variação</string>
+    <string name="cd_classificacao_icon">Tipo de cliente</string>
 </resources>

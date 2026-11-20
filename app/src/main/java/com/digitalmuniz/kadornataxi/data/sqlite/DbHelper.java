@@ -1,21 +1,46 @@
 package com.digitalmuniz.kadornataxi.data.sqlite;
 
 import android.content.Context;
+import android.database.Cursor;
 import android.database.sqlite.SQLiteDatabase;
 import android.database.sqlite.SQLiteOpenHelper;
 
 public class DbHelper extends SQLiteOpenHelper {
-    private static final String DATABASE_NAME = "kadorna_taxi.db";
-    private static final int DATABASE_VERSION = 5;
+    public static final String DATABASE_NAME = "kadorna_taxi.db";
+    public static final int DATABASE_VERSION = 6;
+
+    private static volatile DbHelper instance;
+
+    public static DbHelper getInstance(Context context) {
+        if (instance == null) {
+            synchronized (DbHelper.class) {
+                if (instance == null) {
+                    instance = new DbHelper(context.getApplicationContext());
+                }
+            }
+        }
+        return instance;
+    }
 
     public DbHelper(Context context) {
-        super(context, DbHelper.DATABASE_NAME, null, DATABASE_VERSION);
+        super(context, DATABASE_NAME, null, DATABASE_VERSION);
+    }
+
+    public DbHelper(Context context, String databaseName) {
+        super(context, databaseName, null, DATABASE_VERSION);
+    }
+
+    @Override
+    public void onConfigure(SQLiteDatabase db) {
+        super.onConfigure(db);
+        db.enableWriteAheadLogging();
     }
 
     @Override
     public void onCreate(SQLiteDatabase db) {
         db.execSQL(Viagem.CRIAR_TABELA);
         db.execSQL(Configuracao.CRIAR_TABELA);
+        criarIndices(db);
     }
 
     @Override
@@ -32,8 +57,41 @@ public class DbHelper extends SQLiteOpenHelper {
             db.execSQL("ALTER TABLE " + Configuracao.NOME_TABELA + " ADD COLUMN " + Configuracao.EMAIL + " TEXT");
         }
         if (oldVersion < 5) {
+            garantirColunaSolicitante(db);
+        }
+        if (oldVersion < 6) {
+            // Garante compatibilidade tanto com bancos v5 vindos de feat-solicitante quanto builds de dev sem a coluna.
+            garantirColunaSolicitante(db);
+            criarIndices(db);
+        }
+    }
+
+    private void garantirColunaSolicitante(SQLiteDatabase db) {
+        if (!colunaExiste(db, Viagem.NOME_TABELA, Viagem.SOLICITANTE)) {
             db.execSQL("ALTER TABLE " + Viagem.NOME_TABELA + " ADD COLUMN " + Viagem.SOLICITANTE + " TEXT DEFAULT ''");
         }
+    }
+
+    private boolean colunaExiste(SQLiteDatabase db, String tabela, String coluna) {
+        try (Cursor cursor = db.rawQuery("PRAGMA table_info(" + tabela + ")", null)) {
+            if (cursor == null) {
+                return false;
+            }
+            int nameIndex = cursor.getColumnIndex("name");
+            while (cursor.moveToNext()) {
+                if (nameIndex != -1 && coluna.equalsIgnoreCase(cursor.getString(nameIndex))) {
+                    return true;
+                }
+            }
+        }
+        return false;
+    }
+
+    private void criarIndices(SQLiteDatabase db) {
+        db.execSQL("CREATE INDEX IF NOT EXISTS idx_viagem_data_hora_id ON " + Viagem.NOME_TABELA +
+                " (" + Viagem.DATA + " DESC, " + Viagem.HORA + " DESC, " + Viagem.ID + " DESC)");
+        db.execSQL("CREATE INDEX IF NOT EXISTS idx_viagem_classif_data_hora_id ON " + Viagem.NOME_TABELA +
+                " (" + Viagem.CLASSIFICACAO + ", " + Viagem.DATA + " DESC, " + Viagem.HORA + " DESC, " + Viagem.ID + " DESC)");
     }
 
     // ---------- Tabela Viagem ----------

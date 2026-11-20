@@ -106,18 +106,34 @@ public class Viagem implements Serializable {
 
     public String getDiaMes() {
         /*
-        * Receive a Date in ISO 8601 format (YYYY-MM-DD) and return the day and month in the format DD/MM (Brazilian legibility)
+         * Receive a Date in ISO 8601 format (YYYY-MM-DD) and return the day and month in the format DD/MM (Brazilian legibility)
          */
-
-        String[] partes = getData().split("-");
+        if (data == null || data.length() < 10) {
+            return data != null ? data : "";
+        }
+        String[] partes = data.split("-");
+        if (partes.length < 3) {
+            return data;
+        }
         return partes[2] + "/" + partes[1];
     }
 
     public static List<MesViagens> gerarListaDeMeses(List<Viagem> todas) {
+        List<MesViagens> listaMeses = new ArrayList<>();
+        if (todas == null) {
+            return listaMeses;
+        }
+
         Map<String, List<Viagem>> viagensPorMes = new LinkedHashMap<>();
 
-        for(Viagem viagem : todas) {
-            String mesAno = viagem.getData().substring(0, 7);
+        for (Viagem viagem : todas) {
+            if (viagem == null) {
+                continue;
+            }
+            String dataViagem = viagem.getData();
+            String mesAno = (dataViagem != null && dataViagem.length() >= 7)
+                    ? dataViagem.substring(0, 7)
+                    : (dataViagem != null ? dataViagem : "");
 
             if (viagem.isNaoComum()) {
                 mesAno += "-" + viagem.getClassificacao();
@@ -128,8 +144,6 @@ public class Viagem implements Serializable {
                     .add(viagem);
         }
 
-        List<MesViagens> listaMeses = new ArrayList<>();
-
         for (String mes : viagensPorMes.keySet()) {
             listaMeses.add(new MesViagens(mes, viagensPorMes.get(mes)));
         }
@@ -137,7 +151,7 @@ public class Viagem implements Serializable {
     }
 
     public boolean isNaoComum() {
-        return !getClassificacao().equals("Comum");
+        return classificacao != null && !classificacao.isEmpty() && !"Comum".equals(classificacao);
     }
 
     // --------------- getters e setters ---------------

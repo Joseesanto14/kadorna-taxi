@@ -69,7 +69,7 @@ public class MesViagensAdapter extends RecyclerView.Adapter<MesViagensAdapter.Vi
         holder.containerExpansivel.setVisibility(mes.isExpandido() ? View.VISIBLE : View.GONE);
 
         holder.btGerarRelatorio.setOnClickListener(v ->
-                listener.onGerarRelatorio(mes.getMesAno(), mes.getViagens()));
+                listener.onGerarRelatorio(mes.getMesAno()));
 
     }
 

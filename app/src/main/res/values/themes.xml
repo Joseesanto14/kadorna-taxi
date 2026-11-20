@@ -6,4 +6,9 @@
     </style>
 
     <style name="Theme.KadornaTaxi" parent="Base.Theme.KadornaTaxi" />
+
+    <!-- BottomNavigationView: indicador verde claro (#E8F5E9) -->
+    <style name="Widget.Kadorna.BottomNavigation.ActiveIndicator" parent="Widget.Material3.BottomNavigationView.ActiveIndicator">
+        <item name="android:color">#E8F5E9</item>
+    </style>
 </resources>
